@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GHC - 局域网文件互传</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  :root {
+    --mc-green:      #5cce63;
+    --mc-green-dark:  #3a8c3f;
+    --mc-green-dk2:   #2d6e32;
+    --mc-blue:       #5b9bd5;
+    --mc-blue-dark:  #3a78b8;
+    --mc-gray:       #8a8a8a;
+    --mc-gray-light: #c0c0c0;
+    --mc-panel:      #2b2b2b;
+    --mc-panel2:     #222222;
+    --mc-bg:         #1a1a1a;
+    --mc-border:     #000000;
+    --mc-border-lit: #555555;
+    --mc-red:        #d04040;
+    --mc-red-dark:   #a02828;
+    --mc-yellow:     #e0c040;
+    --mc-gold:       #d4a017;
+    --mc-dirt:       #8b6a3a;
+    --mc-grass:      #4a8c2a;
+    --mc-shadow:     4px 4px 0 #000;
+    --mc-shadow-sm:  2px 2px 0 #000;
+    --font-pixel:    'Press Start 2P', 'WenQuanYi Micro Hei', monospace;
+    --font-ui:       'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--mc-bg);
+    color: var(--mc-gray-light);
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
+  }
+
+  /* Block texture background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: -2;
+    background:
+      repeating-linear-gradient(0deg, #5a3a1a 0px, #5a3a1a 16px, #6a4a2a 16px, #6a4a2a 32px);
+    opacity: 0.35;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: -1;
+    background: repeating-conic-gradient(#1a1a1a 0% 25%, #1c1c1c 25% 50%);
+    background-size: 32px 32px;
+    opacity: 0.6;
+  }
+
+  /* ===== Layout: Sidebar + Content ===== */
+  .app-shell {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: 52px 1fr 26px;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ===== Top Bar ===== */
+  .topbar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
+    border-bottom: 3px solid #000;
+    z-index: 10;
+  }
+  .topbar .logo {
+    font-family: var(--font-pixel);
+    font-size: 16px;
+    color: var(--mc-green);
+    text-shadow: 2px 2px 0 #000, 0 0 10px rgba(92,206,99,0.5);
+    letter-spacing: 2px;
+  }
+  .topbar .logo .accent { color: var(--mc-gold); }
+  .topbar .logo .dim { color: var(--mc-blue); }
+  .topbar .status-area {
+    display: flex; gap: 14px; align-items: center;
+  }
+  .conn-dot {
+    width: 10px; height: 10px;
+    border: 2px solid #000;
+    image-rendering: pixelated;
+  }
+  .conn-dot.online     { background: var(--mc-green); box-shadow: 0 0 8px var(--mc-green); }
+  .conn-dot.offline    { background: var(--mc-red); }
+  .conn-dot.connecting { background: var(--mc-yellow); animation: blink 0.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    background: var(--mc-panel2);
+    border-right: 3px solid #000;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow-y: auto;
+  }
+  .sidebar .nav-group-title {
+    font-family: var(--font-pixel);
+    font-size: 6px;
+    color: #555;
+    padding: 16px 16px 6px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--mc-gray-light);
+    cursor: pointer;
+    border-left: 4px solid transparent;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+    user-select: none;
+    position: relative;
+  }
+  .nav-item:hover {
+    background: #333;
+    border-left-color: var(--mc-green-dark);
+  }
+  .nav-item.active {
+    background: #383838;
+    border-left-color: var(--mc-green);
+    color: #fff;
+    font-weight: 600;
+  }
+  .nav-item .nav-icon {
+    width: 22px; height: 22px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+  .nav-item.active .nav-icon { opacity: 1; }
+  .nav-item .nav-text {
+    font-family: var(--font-ui);
+    font-size: 14px;
+  }
+  .nav-item .badge {
+    position: absolute;
+    right: 12px;
+    background: var(--mc-red);
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 7px;
+    border: 1px solid #000;
+    font-weight: bold;
+    display: none;
+  }
+  .nav-item .badge.show { display: block; }
+
+  .sidebar .spacer { flex: 1; }
+
+  /* Device card at bottom of sidebar */
+  .sidebar .device-card {
+    margin: 8px 10px 12px;
+    background: #1a1a1a;
+    border: 2px solid #000;
+    padding: 12px;
+  }
+  .sidebar .device-card .label {
+    font-family: var(--font-pixel);
+    font-size: 6px;
+    color: var(--mc-gray);
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+  }
+  .sidebar .device-card .name-display {
+    font-size: 14px;
+    color: var(--mc-green);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 6px;
+  }
+  .sidebar .device-card input {
+    width: 100%;
+    background: #000;
+    border: 1px solid var(--mc-green-dark);
+    color: var(--mc-green);
+    font-family: var(--font-pixel);
+    font-size: 8px;
+    padding: 6px;
+    outline: none;
+  }
+  .sidebar .device-card input:focus { border-color: var(--mc-green); }
+
+  /* ===== Main Content ===== */
+  .main-content {
+    overflow-y: auto;
+    padding: 20px 24px;
+    position: relative;
+  }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ===== MC Panel ===== */
+  .mc-panel {
+    background: var(--mc-panel);
+    border: 3px solid #000;
+    box-shadow: var(--mc-shadow);
+    margin-bottom: 18px;
+  }
+  .mc-panel .panel-header {
+    background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
+    border-bottom: 2px solid #000;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mc-panel .panel-header .panel-icon {
+    width: 18px; height: 18px;
+    image-rendering: pixelated;
+  }
+  .mc-panel .panel-header .panel-title {
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+  .mc-panel .panel-body { padding: 18px; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 11px 20px;
+    font-family: var(--font-pixel);
+    font-size: 9px;
+    color: #fff;
+    background: linear-gradient(180deg, #5a5a5a 0%, #4a4a5a 100%);
+    border: 3px solid #000;
+    box-shadow: var(--mc-shadow-sm);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: filter 0.05s, transform 0.05s, box-shadow 0.05s;
+    user-select: none;
+  }
+  .btn:hover { filter: brightness(1.15); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-green  { background: linear-gradient(180deg, var(--mc-green) 0%, var(--mc-green-dark) 100%); }
+  .btn-blue   { background: linear-gradient(180deg, var(--mc-blue) 0%, var(--mc-blue-dark) 100%); }
+  .btn-red    { background: linear-gradient(180deg, var(--mc-red) 0%, var(--mc-red-dark) 100%); }
+  .btn-gold   { background: linear-gradient(180deg, var(--mc-gold) 0%, #b0880f 100%); color: #000; }
+  .btn-small  { padding: 7px 14px; font-size: 7px; }
+
+  /* ===== Form ===== */
+  .form-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .form-row label {
+    font-size: 13px; color: var(--mc-gray-light);
+    min-width: 90px; font-weight: 500;
+  }
+  .form-row input[type="text"],
+  .form-row input[type="number"],
+  .form-row input[type="password"],
+  .form-row select {
+    flex: 1; min-width: 220px;
+    background: #000; border: 2px solid #333;
+    color: #fff; font-size: 14px; padding: 9px 12px;
+    font-family: var(--font-ui); outline: none;
+  }
+  .form-row input:focus, .form-row select:focus { border-color: var(--mc-green); }
+  .form-row textarea {
+    width: 100%; min-height: 90px;
+    background: #0a0a0a; border: 2px solid #333;
+    color: var(--mc-green); font-family: var(--font-pixel);
+    font-size: 8px; padding: 12px; resize: vertical; outline: none; line-height: 1.6;
+  }
+  .form-row textarea:focus { border-color: var(--mc-green); }
+
+  /* ===== File Drop Zone ===== */
+  .drop-zone {
+    border: 3px dashed #444;
+    background: #1a1a1a;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--mc-green);
+    background: #1e2a1e;
+  }
+  .drop-zone .dz-icon {
+    font-family: var(--font-pixel);
+    font-size: 32px;
+    color: #444;
+    margin-bottom: 14px;
+    line-height: 1;
+  }
+  .drop-zone.dragover .dz-icon { color: var(--mc-green); }
+  .drop-zone .dz-text { font-size: 15px; color: var(--mc-gray); }
+  .drop-zone .dz-hint {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: #555;
+    margin-top: 10px;
+  }
+
+  /* ===== File List ===== */
+  .file-list { margin-top: 14px; max-height: 320px; overflow-y: auto; }
+  .file-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    background: #1e1e1e;
+    border: 2px solid #333;
+    margin-bottom: 6px;
+    transition: border-color 0.15s;
+  }
+  .file-item:hover { border-color: #555; }
+  .file-item .fi-icon {
+    width: 34px; height: 34px;
+    image-rendering: pixelated; flex-shrink: 0;
+    border: 2px solid #000;
+  }
+  .file-item .fi-info { flex: 1; min-width: 0; }
+  .file-item .fi-name {
+    font-size: 14px; color: #fff;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .file-item .fi-size {
+    font-family: var(--font-pixel); font-size: 7px;
+    color: var(--mc-gray); margin-top: 3px;
+  }
+  .file-item .fi-status {
+    font-family: var(--font-pixel); font-size: 7px;
+    padding: 3px 8px; border: 1px solid #000; flex-shrink: 0;
+  }
+  .fi-status.queued     { background: #444; color: #ccc; }
+  .fi-status.sending    { background: var(--mc-green-dark); color: #fff; }
+  .fi-status.done       { background: var(--mc-green); color: #000; }
+  .fi-status.error      { background: var(--mc-red); color: #fff; }
+  .fi-status.receiving  { background: var(--mc-blue-dark); color: #fff; }
+
+  /* ===== Progress Bar ===== */
+  .progress-wrap { margin-top: 8px; }
+  .progress-bar {
+    height: 24px; background: #0a0a0a;
+    border: 2px solid #000; position: relative; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: repeating-linear-gradient(-45deg, var(--mc-green) 0px, var(--mc-green) 6px, var(--mc-green-dark) 6px, var(--mc-green-dark) 12px);
+    transition: width 0.2s ease-out;
+    image-rendering: pixelated;
+  }
+  .progress-fill.blue {
+    background: repeating-linear-gradient(-45deg, var(--mc-blue) 0px, var(--mc-blue) 6px, var(--mc-blue-dark) 6px, var(--mc-blue-dark) 12px);
+  }
+  .progress-text {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-pixel); font-size: 9px;
+    color: #fff; text-shadow: 1px 1px 0 #000; z-index: 1;
+  }
+  .progress-info {
+    display: flex; justify-content: space-between;
+    margin-top: 5px;
+    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray);
+  }
+
+  /* ===== Log Console ===== */
+  .log-console {
+    background: #0a0a0a; border: 2px solid #000;
+    height: 200px; overflow-y: auto; padding: 12px;
+    font-family: var(--font-pixel); font-size: 7px; line-height: 2.2;
+  }
+  .log-line { white-space: pre-wrap; word-break: break-all; }
+  .log-info  { color: var(--mc-gray-light); }
+  .log-ok    { color: var(--mc-green); }
+  .log-warn  { color: var(--mc-yellow); }
+  .log-err   { color: var(--mc-red); }
+  .log-data  { color: var(--mc-blue); }
+
+  /* ===== Transfer Table ===== */
+  .xf-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .xf-table th {
+    background: #333; color: var(--mc-gray-light);
+    font-family: var(--font-pixel); font-size: 7px;
+    padding: 10px 12px; text-align: left; border-bottom: 2px solid #000;
+  }
+  .xf-table td { padding: 10px 12px; border-bottom: 1px solid #333; color: #ccc; }
+  .xf-table tr:hover td { background: #2a2a2a; }
+  .tag { font-family: var(--font-pixel); font-size: 7px; padding: 3px 8px; border: 1px solid #000; }
+  .tag-send  { background: var(--mc-green-dark); color: #fff; }
+  .tag-recv  { background: var(--mc-blue-dark); color: #fff; }
+  .tag-done  { background: var(--mc-green-dk2); color: #fff; }
+  .tag-fail  { background: var(--mc-red); color: #fff; }
+
+  /* ===== Info Grid ===== */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .info-card {
+    background: #1e1e1e; border: 2px solid #333; padding: 14px;
+  }
+  .info-card .ic-label {
+    font-family: var(--font-pixel); font-size: 7px;
+    color: var(--mc-gray); margin-bottom: 6px;
+  }
+  .info-card .ic-value {
+    font-size: 16px; color: #fff; font-weight: 600;
+  }
+  .info-card .ic-value.green  { color: var(--mc-green); }
+  .info-card .ic-value.red    { color: var(--mc-red); }
+  .info-card .ic-value.yellow { color: var(--mc-yellow); }
+
+  /* ===== Toolbar ===== */
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+
+  /* ===== Peer List ===== */
+  .peer-list { display: flex; flex-direction: column; gap: 10px; }
+  .peer-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px; background: #1e1e1e; border: 2px solid #333;
+    transition: border-color 0.15s;
+  }
+  .peer-item:hover { border-color: var(--mc-green); }
+  .peer-item .peer-avatar {
+    width: 40px; height: 40px;
+    background: var(--mc-green-dark); border: 2px solid #000;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-pixel); font-size: 14px; color: #fff; flex-shrink: 0;
+  }
+  .peer-item .peer-info { flex: 1; }
+  .peer-item .peer-name { font-size: 15px; color: #fff; font-weight: 600; }
+  .peer-item .peer-meta {
+    font-family: var(--font-pixel); font-size: 7px;
+    color: var(--mc-gray); margin-top: 3px;
+  }
+
+  /* ===== Modal ===== */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: var(--mc-panel); border: 3px solid #000;
+    box-shadow: 6px 6px 0 #000; min-width: 420px; max-width: 600px; max-height: 80vh; overflow-y: auto;
+  }
+  .modal-box .panel-header {
+    background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
+    border-bottom: 2px solid #000; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-box .panel-header .panel-title {
+    font-family: var(--font-pixel); font-size: 11px; color: #fff;
+  }
+  .modal-box .panel-body { padding: 18px; }
+
+  /* ===== Status Bar ===== */
+  .statusbar {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px;
+    background: #111; border-top: 2px solid #000;
+    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray);
+    z-index: 10;
+  }
+  .statusbar .sb-left, .statusbar .sb-right { display: flex; gap: 18px; align-items: center; }
+  .statusbar .sb-item { display: flex; align-items: center; gap: 5px; }
+
+  /* ===== Utility ===== */
+  .hidden { display: none !important; }
+  .text-green  { color: var(--mc-green); }
+  .text-red    { color: var(--mc-red); }
+  .text-yellow { color: var(--mc-yellow); }
+  .text-blue   { color: var(--mc-blue); }
+  .text-gray   { color: var(--mc-gray); }
+  .mt8  { margin-top: 8px; }
+  .mt12 { margin-top: 12px; }
+  .mt16 { margin-top: 16px; }
+  .mb8  { margin-bottom: 8px; }
+  .mb12 { margin-bottom: 12px; }
+  .flex-gap { display: flex; gap: 10px; flex-wrap: wrap; }
+  .text-center { text-align: center; }
+  .small-pixel { font-family: var(--font-pixel); font-size: 7px; }
+
+  /* ===== Scrollbar ===== */
+  ::-webkit-scrollbar { width: 12px; }
+  ::-webkit-scrollbar-track { background: #1a1a1a; border-left: 2px solid #000; }
+  ::-webkit-scrollbar-thumb { background: #444; border: 2px solid #000; }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 768px) {
+    .app-shell { grid-template-columns: 60px 1fr; }
+    .sidebar .nav-text, .sidebar .nav-group-title,
+    .sidebar .device-card .label, .sidebar .device-card .name-display,
+    .sidebar .device-card input { display: none; }
+    .sidebar .device-card { margin: 4px; padding: 6px; }
+    .nav-item { padding: 12px; justify-content: center; }
+    .topbar .logo { font-size: 11px; }
+  }
+
+  /* ===== Connection Method Cards ===== */
+  .method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .method-card {
+    background: #1e1e1e;
+    border: 3px solid #333;
+    padding: 20px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.05s;
+    position: relative;
+  }
+  .method-card:hover { border-color: var(--mc-green); }
+  .method-card.selected { border-color: var(--mc-green); background: #1a2a1a; }
+  .method-card .mc-label {
+    font-family: var(--font-pixel); font-size: 8px;
+    color: var(--mc-green); margin-bottom: 8px; letter-spacing: 1px;
+  }
+  .method-card .mc-title {
+    font-size: 16px; color: #fff; font-weight: 600; margin-bottom: 6px;
+  }
+  .method-card .mc-desc {
+    font-size: 13px; color: var(--mc-gray); line-height: 1.6;
+  }
+  .method-card .mc-radio {
+    position: absolute; top: 14px; right: 14px;
+    width: 16px; height: 16px; border: 2px solid #555; background: #000;
+  }
+  .method-card.selected .mc-radio { border-color: var(--mc-green); background: var(--mc-green); }
+
+  /* ===== Auto-discovery status ===== */
+  .discovery-panel {
+    background: #1a2a1a; border: 2px solid var(--mc-green-dark);
+    padding: 14px 18px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .discovery-panel .dp-icon {
+    width: 12px; height: 12px; border: 2px solid #000;
+    background: var(--mc-green); box-shadow: 0 0 8px var(--mc-green);
+    flex-shrink: 0;
+  }
+  .discovery-panel.disconnected .dp-icon {
+    background: var(--mc-yellow); box-shadow: 0 0 6px var(--mc-yellow);
+  }
+  .discovery-panel.connected {
+    background: #1a3a1a; border-color: var(--mc-green);
+  }
+  .discovery-panel.connected .dp-icon {
+    background: var(--mc-green); box-shadow: 0 0 12px var(--mc-green);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .discovery-panel .dp-text {
+    font-size: 14px; color: #ccc; flex: 1;
+  }
+  .discovery-panel .dp-text strong { color: var(--mc-green); }
+  .discovery-panel .dp-hint {
+    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray);
+  }
+
+  /* ===== Broadcast peer list ===== */
+  .broadcast-peer {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px; background: #1e1e1e; border: 2px solid #333;
+    margin-bottom: 8px;
+  }
+  .broadcast-peer .bp-avatar {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--mc-blue), var(--mc-green-dark));
+    border: 2px solid #000;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-pixel); font-size: 14px; color: #fff; flex-shrink: 0;
+  }
+  .broadcast-peer .bp-info { flex: 1; }
+  .broadcast-peer .bp-name { font-size: 15px; color: #fff; font-weight: 600; }
+  .broadcast-peer .bp-meta {
+    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray); margin-top: 3px;
+  }
+  .broadcast-peer .bp-badge {
+    font-family: var(--font-pixel); font-size: 7px;
+    padding: 3px 8px; border: 1px solid #000;
+    background: var(--mc-green-dark); color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ========== TOP BAR ========== -->
+  <div class="topbar">
+    <div class="logo">G<span class="accent">H</span>C <span class="dim">//</span> 局域网文件互传</div>
+    <div class="status-area">
+      <span class="small-pixel text-gray" id="topbarRoom">房间: --</span>
+      <span class="conn-dot offline" id="connDot"></span>
+      <span class="small-pixel" id="connText" style="color:var(--mc-gray)">未连接</span>
+    </div>
+  </div>
+
+  <!-- ========== SIDEBAR ========== -->
+  <div class="sidebar">
+    <div class="nav-group-title">-- 主菜单 --</div>
+
+    <div class="nav-item active" data-page="page-dashboard">
+      <svg class="nav-icon" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" fill="#5cce63"/><rect x="9" y="1" width="6" height="6" fill="#5b9bd5"/><rect x="1" y="9" width="6" height="6" fill="#e0c040"/><rect x="9" y="9" width="6" height="6" fill="#d04040"/></svg>
+      <span class="nav-text">状态面板</span>
+    </div>
+
+    <div class="nav-item" data-page="page-connect">
+      <svg class="nav-icon" viewBox="0 0 16 16"><rect x="2" y="6" width="12" height="4" fill="#5b9bd5"/><rect x="6" y="2" width="4" height="12" fill="#5b9bd5"/><rect x="2" y="6" width="3" height="4" fill="#3a78b8"/><rect x="11" y="6" width="3" height="4" fill="#3a78b8"/></svg>
+      <span class="nav-text">建立连接</span>
+    </div>
+
+    <div class="nav-group-title">-- 传输 --</div>
+
+    <div class="nav-item" data-page="page-send">
+      <svg class="nav-icon" viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="12" fill="#c0c0c0"/><rect x="5" y="3" width="6" height="1" fill="#000"/><rect x="5" y="5" width="6" height="1" fill="#000"/><rect x="5" y="7" width="4" height="1" fill="#000"/><rect x="6" y="13" width="4" height="2" fill="#5cce63"/><rect x="7" y="11" width="2" height="2" fill="#5cce63"/></svg>
+      <span class="nav-text">发送文件</span>
+      <span class="badge" id="sendBadge">0</span>
+    </div>
+
+    <div class="nav-item" data-page="page-receive">
+      <svg class="nav-icon" viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="12" fill="#c0c0c0"/><rect x="5" y="3" width="6" height="1" fill="#000"/><rect x="5" y="5" width="6" height="1" fill="#000"/><rect x="5" y="7" width="4" height="1" fill="#000"/><rect x="6" y="13" width="4" height="2" fill="#5b9bd5"/><rect x="7" y="11" width="2" height="2" fill="#5b9bd5"/></svg>
+      <span class="nav-text">接收文件</span>
+      <span class="badge" id="recvBadge">0</span>
+    </div>
+
+    <div class="nav-group-title">-- 其他 --</div>
+
+    <div class="nav-item" data-page="page-history">
+      <svg class="nav-icon" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#3a3a3a"/><rect x="4" y="4" width="8" height="1" fill="#5cce63"/><rect x="4" y="6" width="8" height="1" fill="#5b9bd5"/><rect x="4" y="8" width="6" height="1" fill="#e0c040"/><rect x="4" y="10" width="7" height="1" fill="#d04040"/></svg>
+      <span class="nav-text">传输记录</span>
+    </div>
+
+    <div class="nav-item" data-page="page-settings">
+      <svg class="nav-icon" viewBox="0 0 16 16"><rect x="6" y="1" width="4" height="3" fill="#8a8a8a"/><rect x="3" y="4" width="10" height="8" fill="#5a5a5a"/><rect x="5" y="6" width="6" height="4" fill="#3a3a3a"/><rect x="7" y="12" width="2" height="3" fill="#8a8a8a"/><rect x="6" y="7" width="1" height="1" fill="#5cce63"/><rect x="9" y="7" width="1" height="1" fill="#5cce63"/><rect x="7" y="8" width="2" height="1" fill="#e0c040"/></svg>
+      <span class="nav-text">设置</span>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="device-card">
+      <div class="label">设备名称</div>
+      <div class="name-display" id="sidebarDevName">未设置</div>
+      <input type="text" id="sidebarDevInput" placeholder="输入设备名..." maxlength="20" />
+    </div>
+  </div>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <div class="main-content">
+
+    <!-- ===== PAGE: Dashboard ===== -->
+    <div class="page active" id="page-dashboard">
+      <div class="mc-panel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" fill="#5cce63"/><rect x="9" y="1" width="6" height="6" fill="#5b9bd5"/><rect x="1" y="9" width="6" height="6" fill="#e0c040"/><rect x="9" y="9" width="6" height="6" fill="#d04040"/></svg>
+          <span class="panel-title">状态面板 / DASHBOARD</span>
+        </div>
+        <div class="panel-body">
+          <div class="info-grid" id="infoGrid">
+            <div class="info-card">
+              <div class="ic-label">连接状态</div>
+              <div class="ic-value red" id="infoConn">离线</div>
+            </div>
+            <div class="info-card">
+              <div class="ic-label">对端设备</div>
+              <div class="ic-value" id="infoPeer">--</div>
+            </div>
+            <div class="info-card">
+              <div class="ic-label">本机名称</div>
+              <div class="ic-value" id="infoName">未设置</div>
+            </div>
+            <div class="info-card">
+              <div class="ic-label">房间号</div>
+              <div class="ic-value yellow" id="infoRoom">--</div>
+            </div>
+            <div class="info-card">
+              <div class="ic-label">已发送</div>
+              <div class="ic-value green" id="infoSent">0 B</div>
+            </div>
+            <div class="info-card">
+              <div class="ic-label">已接收</div>
+              <div class="ic-value" id="infoRecv">0 B</div>
+            </div>
+          </div>
+
+          <div class="mt16 toolbar">
+            <button class="btn btn-green" id="btnQuickConnect">[ 快速连接 ]</button>
+            <button class="btn btn-red" id="btnDisconnect">[ 断开连接 ]</button>
+            <button class="btn" id="btnOpenSend">[ 去发送文件 ]</button>
+          </div>
+
+          <div class="mt12">
+            <div style="font-family:var(--font-pixel);font-size:8px;color:var(--mc-gray);margin-bottom:8px;">实时日志</div>
+            <div class="log-console" id="logConsole"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: Connect ===== -->
+    <div class="page" id="page-connect">
+      <!-- Auto-discovery notice -->
+      <div class="discovery-panel" id="discoveryPanel">
+        <div class="dp-icon" id="dpIcon"></div>
+        <div class="dp-text" id="discoveryText">
+          正在广播发现信号... 房间: <strong id="discoveryRoom">GHC-001</strong>
+        </div>
+        <div class="dp-hint" id="discoveryHint">同一浏览器多标签页自动发现</div>
+      </div>
+
+      <!-- Quick Help -->
+      <div class="mc-panel" id="quickHelpPanel">
+        <div class="panel-header">
+          <span class="panel-title">连接帮助 / HOW TO CONNECT</span>
+        </div>
+        <div class="panel-body" style="font-size:13px;line-height:2;color:#ccc;">
+          <p><strong style="color:var(--mc-green)">情况一：两台设备都用本页面（同一WiFi）</strong></p>
+          <p style="color:#999;margin-left:16px;">
+            1. 双方都打开本页面（确保URL相同）<br/>
+            2. 各自在下方"局域网设备"列表看到对方<br/>
+            3. 点击对方旁边的 <span style="color:var(--mc-green)">[连接]</span> 按钮<br/>
+            4. 等待状态变为绿色"已连接"
+          </p>
+          <p style="margin-top:8px;"><strong style="color:var(--mc-yellow)">情况二：BroadcastChannel 不可用时</strong></p>
+          <p style="color:#999;margin-left:16px;">
+            1. 下方选择 <span style="color:var(--mc-yellow)">[方法二: 手动密钥交换]</span><br/>
+            2. 发起方点"生成邀请密钥"→ 复制密钥 → 通过微信/QQ发送<br/>
+            3. 接收方粘贴密钥 → 点"确认并连接"<br/>
+            4. 发起方收到应答密钥后粘贴 → 完成连接
+          </p>
+          <p style="margin-top:8px;color:var(--mc-gray);font-size:12px;">
+            提示: 页面显示"未连接"是正常初始状态，必须完成上述步骤才会变绿。
+          </p>
+        </div>
+      </div>
+
+      <!-- Method selection -->
+      <div class="method-grid mb12">
+        <div class="method-card selected" id="methodBroadcast">
+          <div class="mc-radio"></div>
+          <div class="mc-label">方法一</div>
+          <div class="mc-title">局域网自动发现</div>
+          <div class="mc-desc">同一台电脑的多标签页自动发现并连接。跨设备需配合手动密钥交换使用。</div>
+        </div>
+        <div class="method-card" id="methodManual">
+          <div class="mc-radio"></div>
+          <div class="mc-label">方法二</div>
+          <div class="mc-title">手动密钥交换</div>
+          <div class="mc-desc">生成连接密钥，通过微信/QQ 等任意方式发送给对方，粘贴即可建立连接。</div>
+        </div>
+      </div>
+
+      <!-- Broadcast peers -->
+      <div class="mc-panel" id="broadcastPanel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="#5cce63"/><rect x="5" y="5" width="6" height="6" fill="#3a8c3f"/><rect x="7" y="1" width="2" height="2" fill="#e0c040"/></svg>
+          <span class="panel-title">局域网设备 / LOCAL DEVICES</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <label>房间号</label>
+            <input type="text" id="roomInput" value="GHC-001" placeholder="房间名" style="max-width:200px" />
+            <button class="btn btn-small" id="btnChangeRoom">切换房间</button>
+            <span class="small-pixel text-gray">同一房间内的设备自动可见</span>
+          </div>
+          <div class="peer-list mt8" id="peerList"></div>
+        </div>
+      </div>
+
+      <!-- Manual SDP -->
+      <div class="mc-panel mt16 hidden" id="manualPanel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="2" y="6" width="12" height="4" fill="#5b9bd5"/><rect x="6" y="2" width="4" height="12" fill="#5b9bd5"/></svg>
+          <span class="panel-title">手动连接 / MANUAL SDP</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <label>我的角色</label>
+            <select id="sdpMode">
+              <option value="offer">发起方 (我创建邀请)</option>
+              <option value="answer">接收方 (我回应邀请)</option>
+            </select>
+          </div>
+
+          <div id="sdpStep1">
+            <div class="form-row">
+              <label>步骤 1</label>
+              <button class="btn btn-green btn-small" id="btnGenOffer">生成邀请密钥</button>
+              <span class="small-pixel text-gray">将下方密钥发送给对方</span>
+            </div>
+            <div class="form-row">
+              <textarea id="txtOffer" placeholder="点击上方按钮生成邀请密钥..." readonly></textarea>
+            </div>
+            <div class="form-row">
+              <button class="btn btn-small" id="btnCopyOffer">复制密钥</button>
+            </div>
+          </div>
+
+          <div id="sdpStep2" class="mt12">
+            <div class="form-row">
+              <label>步骤 2</label>
+              <span class="small-pixel text-gray" id="sdpStep2Label">粘贴对方发来的密钥</span>
+            </div>
+            <div class="form-row">
+              <textarea id="txtAnswer" placeholder="在此粘贴对方的密钥..."></textarea>
+            </div>
+            <div class="form-row">
+              <button class="btn btn-blue btn-small" id="btnApplyAnswer">确认并连接</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: Send ===== -->
+    <div class="page" id="page-send">
+      <div class="mc-panel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="12" fill="#c0c0c0"/><rect x="6" y="13" width="4" height="2" fill="#5cce63"/></svg>
+          <span class="panel-title">发送文件 / SEND</span>
+        </div>
+        <div class="panel-body">
+          <div class="drop-zone" id="dropZone">
+            <div class="dz-icon">[ + ]</div>
+            <div class="dz-text">拖拽文件到此处，或点击选择文件</div>
+            <div class="dz-hint">支持多文件 / 大文件分块传输 / 最大 10GB</div>
+            <input type="file" id="fileInput" multiple style="display:none" />
+          </div>
+
+          <div class="file-list" id="sendFileList"></div>
+
+          <div class="mt12 toolbar">
+            <button class="btn btn-green" id="btnStartSend" disabled>[ 开始发送 ]</button>
+            <button class="btn btn-red" id="btnClearSend">[ 清空列表 ]</button>
+          </div>
+
+          <div id="activeSend" class="mt12 hidden">
+            <div style="font-family:var(--font-pixel);font-size:9px;color:var(--mc-green);margin-bottom:6px;" id="activeSendName">--</div>
+            <div class="progress-wrap">
+              <div class="progress-bar">
+                <div class="progress-fill" id="activeSendBar"></div>
+                <div class="progress-text" id="activeSendPct">0%</div>
+              </div>
+            </div>
+            <div class="progress-info">
+              <span id="activeSendSize">0 / 0</span>
+              <span id="activeSendSpeed">-- MB/s</span>
+              <span id="activeSendEta">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: Receive ===== -->
+    <div class="page" id="page-receive">
+      <div class="mc-panel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="12" fill="#c0c0c0"/><rect x="6" y="13" width="4" height="2" fill="#5b9bd5"/></svg>
+          <span class="panel-title">接收文件 / RECEIVE</span>
+        </div>
+        <div class="panel-body">
+          <div id="recvEmpty" class="text-center mt12 mb12">
+            <div style="font-family:var(--font-pixel);font-size:12px;color:#444;margin-bottom:10px;">[ 等待接收 ]</div>
+            <div class="text-gray">连接建立后，文件将自动出现在这里</div>
+          </div>
+          <div class="file-list" id="recvFileList"></div>
+
+          <div id="activeRecv" class="mt12 hidden">
+            <div style="font-family:var(--font-pixel);font-size:9px;color:var(--mc-blue);margin-bottom:6px;" id="activeRecvName">--</div>
+            <div class="progress-wrap">
+              <div class="progress-bar">
+                <div class="progress-fill blue" id="activeRecvBar"></div>
+                <div class="progress-text" id="activeRecvPct">0%</div>
+              </div>
+            </div>
+            <div class="progress-info">
+              <span id="activeRecvSize">0 / 0</span>
+              <span id="activeRecvSpeed">-- MB/s</span>
+              <span id="activeRecvEta">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: History ===== -->
+    <div class="page" id="page-history">
+      <div class="mc-panel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#3a3a3a"/><rect x="4" y="4" width="8" height="1" fill="#5cce63"/><rect x="4" y="6" width="8" height="1" fill="#5b9bd5"/><rect x="4" y="8" width="6" height="1" fill="#e0c040"/></svg>
+          <span class="panel-title">传输记录 / HISTORY</span>
+        </div>
+        <div class="panel-body">
+          <div class="toolbar">
+            <button class="btn btn-small" id="btnClearHistory">清空记录</button>
+            <span class="small-pixel text-gray" id="historyCount">共 0 条记录</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="xf-table" id="historyTable">
+              <thead>
+                <tr>
+                  <th>时间</th><th>文件名</th><th>大小</th><th>方向</th><th>状态</th><th>耗时</th><th>速度</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE: Settings ===== -->
+    <div class="page" id="page-settings">
+      <div class="mc-panel">
+        <div class="panel-header">
+          <svg class="panel-icon" viewBox="0 0 16 16"><rect x="6" y="1" width="4" height="3" fill="#8a8a8a"/><rect x="3" y="4" width="10" height="8" fill="#5a5a5a"/><rect x="7" y="12" width="2" height="3" fill="#8a8a8a"/></svg>
+          <span class="panel-title">设置 / SETTINGS</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <label>设备名称</label>
+            <input type="text" id="setDevName" placeholder="我的设备" maxlength="20" />
+          </div>
+          <div class="form-row">
+            <label>分块大小</label>
+            <select id="setChunkSize">
+              <option value="8192">8 KB (慢速网络)</option>
+              <option value="16384" selected>16 KB (推荐)</option>
+              <option value="32768">32 KB (高速网络)</option>
+              <option value="65536">64 KB (局域网)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>背压阈值</label>
+            <select id="setBackpressure">
+              <option value="1048576">1 MB</option>
+              <option value="2097152">2 MB</option>
+              <option value="4194304" selected>4 MB (推荐)</option>
+              <option value="8388608">8 MB</option>
+            </select>
+            <span class="small-pixel text-gray">缓冲区超过此值暂停发送</span>
+          </div>
+          <div class="form-row">
+            <label>信令服务器</label>
+            <input type="text" id="setSignalUrl" placeholder="wss://your-server.com:8787" />
+          </div>
+          <div class="form-row">
+            <label>默认房间</label>
+            <input type="text" id="setRoom" placeholder="GHC-001" />
+          </div>
+          <div class="form-row">
+            <label>音频提示</label>
+            <select id="setAudio">
+              <option value="on" selected>开启</option>
+              <option value="off">关闭</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>ICE 服务器</label>
+            <textarea id="setIceServers" placeholder='[{"urls":"stun:stun.l.google.com:19302"}]'>[{"urls":"stun:stun.l.google.com:19302"}]</textarea>
+          </div>
+          <div class="toolbar mt12">
+            <button class="btn btn-green" id="btnSaveSettings">保存设置</button>
+            <button class="btn" id="btnExportSettings">导出配置</button>
+            <button class="btn btn-blue" id="btnImportSettings">导入配置</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" />
+          </div>
+        </div>
+      </div>
+
+      <div class="mc-panel mt16">
+        <div class="panel-header">
+          <span class="panel-title">关于 / ABOUT</span>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:14px;color:#ccc;line-height:1.8;">
+            <strong style="color:var(--mc-green)">GHC</strong> - 局域网文件互传工具<br/>
+            版本: v3.0.0<br/>
+            协议: WebRTC DataChannel (P2P)<br/>
+            特性: 零依赖单文件 / 分块传输 / 大文件支持 / 局域网自动发现 / MC 像素风格<br/>
+            浏览器: Chrome 56+ / Firefox 44+ / Edge 79+ / Safari 11+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+
+  <!-- ========== STATUS BAR ========== -->
+  <div class="statusbar">
+    <div class="sb-left">
+      <span class="sb-item"><span class="conn-dot online" id="sbConnDot" style="width:6px;height:6px;display:none"></span><span id="sbConnText">就绪</span></span>
+      <span class="sb-item" id="sbPeer">对端: --</span>
+    </div>
+    <div class="sb-right">
+      <span class="sb-item" id="sbSent">发送: 0 B</span>
+      <span class="sb-item" id="sbRecv">接收: 0 B</span>
+      <span class="sb-item" id="sbTime">00:00:00</span>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+<!-- ========== MODAL: Pair Request ========== -->
+<div class="modal-overlay" id="pairModal">
+  <div class="modal-box">
+    <div class="panel-header">
+      <span class="panel-title">配对请求</span>
+    </div>
+    <div class="panel-body">
+      <div id="pairModalBody" style="font-size:14px;color:#ccc;line-height:1.8;"></div>
+      <div class="toolbar mt12">
+        <button class="btn btn-green" id="btnAcceptPair">接受</button>
+        <button class="btn btn-red" id="btnRejectPair">拒绝</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL: Incoming File ========== -->
+<div class="modal-overlay" id="incomingModal">
+  <div class="modal-box">
+    <div class="panel-header">
+      <span class="panel-title">收到文件</span>
+    </div>
+    <div class="panel-body">
+      <div id="incomingBody" style="font-size:14px;color:#ccc;line-height:1.8;"></div>
+      <div class="toolbar mt12">
+        <button class="btn btn-green" id="btnAcceptFile">接收</button>
+        <button class="btn btn-red" id="btnRejectFile">拒绝</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ========================================================================
+   GHC - LAN File Transfer (Minecraft Pixel Style) v3.0.0
+   Features: BroadcastChannel auto-discovery + Manual SDP + WebSocket signal
+   ======================================================================== */
+
+// ===== Constants =====
+const CHUNK_SIZE_DEFAULT = 16384;
+const BACKPRESSURE_DEFAULT = 4194304;
+const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024;
+const SIGNAL_PROTOCOL = 'ghc/1.0';
+const BROADCAST_CHANNEL_PREFIX = 'ghc-room-';
+const BROADCAST_HEARTBEAT = 3000; // ms
+
+// ===== State =====
+const state = {
+  deviceName: 'PC-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
+  room: 'GHC-001',
+  chunkSize: CHUNK_SIZE_DEFAULT,
+  backpressure: BACKPRESSURE_DEFAULT,
+  audioEnabled: true,
+  rtc: null,
+  dataChannel: null,
+  signalWs: null,
+  signalUrl: '',
+  peers: [],           // broadcast-discovered peers
+  pendingPair: null,
+  pendingFiles: [],
+  sending: false,
+  sendQueue: [],
+  currentSend: null,
+  recvBuffers: new Map(),
+  recvMeta: null,
+  bytesSent: 0,
+  bytesRecv: 0,
+  history: [],
+  startTime: Date.now(),
+  timerInterval: null,
+  connected: false,
+  peerName: '',
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  // BroadcastChannel
+  bc: null,
+  bcId: Math.random().toString(36).substr(2, 10),
+  bcPeers: new Map(), // id -> {name, lastSeen}
+  connectMethod: 'broadcast', // 'broadcast' | 'manual'
+};
+
+// ===== DOM Helpers =====
+const $ = (id) => document.getElementById(id);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function el(tag, attrs = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k.startsWith('on') && typeof v === 'function') {
+      e.addEventListener(k.slice(2), v);
+    } else {
+      e.setAttribute(k, v);
+    }
+  }
+  for (const c of children) e.appendChild(c);
+  return e;
+}
+
+// ===== Logging =====
+function log(msg, level = 'info') {
+  const console = $('logConsole');
+  const line = el('div', { class: `log-line log-${level}`, text: `[${nowStr()}] ${msg}` });
+  console.appendChild(line);
+  console.scrollTop = console.scrollHeight;
+  while (console.children.length > 500) console.removeChild(console.firstChild);
+}
+
+function nowStr() {
+  const d = new Date();
+  return d.toTimeString().slice(0, 8);
+}
+
+// ===== Formatters =====
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+function fmtSpeed(bps) {
+  if (bps < 1048576) return (bps / 1024).toFixed(0) + ' KB/s';
+  return (bps / 1048576).toFixed(1) + ' MB/s';
+}
+
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function fmtEta(ms) {
+  if (ms < 0 || !isFinite(ms)) return '--';
+  return 'ETA ' + fmtTime(ms);
+}
+
+// ===== File type icon =====
+function fileTypeColor(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const map = {
+    png:'#5cce63', jpg:'#5cce63', jpeg:'#5cce63', gif:'#5cce63', bmp:'#5cce63', webp:'#5cce63', svg:'#5cce63',
+    mp4:'#d04040', avi:'#d04040', mov:'#d04040', mkv:'#d04040', webm:'#d04040', flv:'#d04040',
+    mp3:'#e0c040', wav:'#e0c040', flac:'#e0c040', aac:'#e0c040', ogg:'#e0c040',
+    pdf:'#d04040', doc:'#3a78b8', docx:'#3a78b8', xls:'#2d6e32', xlsx:'#2d6e32', ppt:'#d04040', pptx:'#d04040',
+    zip:'#8a8a8a', rar:'#8a8a8a', '7z':'#8a8a8a', tar:'#8a8a8a', gz:'#8a8a8a',
+    txt:'#c0c0c0', json:'#c0c0c0', xml:'#c0c0c0', js:'#e0c040', py:'#3a78b8', java:'#e0c040', c:'#5cce63', cpp:'#5cce63',
+    exe:'#d04040', msi:'#d04040', apk:'#2d6e32',
+  };
+  return map[ext] || '#8a8a8a';
+}
+
+function fileIconSvg(filename) {
+  const color = fileTypeColor(filename);
+  const letter = (filename.split('.').pop() || '?').charAt(0).toUpperCase();
+  return `<svg class="fi-icon" viewBox="0 0 16 16"><rect x="2" y="1" width="9" height="12" fill="${color}"/><rect x="11" y="1" width="3" height="4" fill="${color}" opacity="0.6"/><rect x="4" y="3" width="5" height="1" fill="#000"/><rect x="4" y="5" width="5" height="1" fill="#000"/><rect x="4" y="7" width="3" height="1" fill="#000"/><rect x="6" y="10" width="4" height="2" fill="#000" opacity="0.5"/><text x="8" y="14" text-anchor="middle" font-family="monospace" font-size="3" fill="#fff" font-weight="bold">${letter}</text></svg>`;
+}
+
+// ===== Audio =====
+let audioCtx = null;
+function playTone(freq, dur, type = 'sine') {
+  if (!state.audioEnabled) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.type = type;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+function beepComplete() { playTone(880, 0.15, 'square'); setTimeout(()=>playTone(1320, 0.2, 'square'), 120); }
+function beepError()   { playTone(220, 0.3, 'sawtooth'); }
+function beepNotify()  { playTone(660, 0.1, 'sine'); }
+
+// ===== Navigation =====
+$$('.nav-item[data-page]').forEach(item => {
+  item.addEventListener('click', () => {
+    const page = item.dataset.page;
+    $$('.nav-item').forEach(n => n.classList.remove('active'));
+    item.classList.add('active');
+    $$('.page').forEach(p => p.classList.remove('active'));
+    $(page).classList.add('active');
+  });
+});
+
+// ===== Device Name =====
+function updateDeviceName() {
+  $('sidebarDevName').textContent = state.deviceName;
+  $('infoName').textContent = state.deviceName;
+}
+$('sidebarDevInput').addEventListener('change', (e) => {
+  const v = e.target.value.trim();
+  if (v) { state.deviceName = v; updateDeviceName(); log(`设备名已更新: ${v}`, 'ok'); broadcastPresence(); }
+});
+$('sidebarDevInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') e.target.blur();
+});
+
+// ===== Connection Status UI =====
+function setConnStatus(status, text) {
+  state.connected = (status === 'online');
+  const dot = $('connDot');
+  dot.className = 'conn-dot ' + status;
+  $('connText').textContent = text;
+  $('connText').style.color = status === 'online' ? 'var(--mc-green)' :
+                               status === 'connecting' ? 'var(--mc-yellow)' : 'var(--mc-red)';
+  $('infoConn').textContent = text;
+  $('infoConn').className = 'ic-value ' + (status === 'online' ? 'green' : status === 'connecting' ? 'yellow' : 'red');
+
+  const sbDot = $('sbConnDot');
+  if (status === 'online') { sbDot.style.display = ''; sbDot.className = 'conn-dot online'; $('sbConnText').textContent = '已连接'; $('sbConnText').style.color = 'var(--mc-green)'; }
+  else if (status === 'connecting') { sbDot.style.display = ''; sbDot.className = 'conn-dot connecting'; $('sbConnText').textContent = '连接中...'; $('sbConnText').style.color = 'var(--mc-yellow)'; }
+  else { sbDot.style.display = 'none'; $('sbConnText').textContent = '离线'; $('sbConnText').style.color = 'var(--mc-gray)'; }
+
+  // Update discovery panel
+  const dp = $('discoveryPanel');
+  if (dp) {
+    dp.classList.remove('connected', 'disconnected');
+    if (status === 'online') dp.classList.add('connected');
+    else if (status === 'offline') dp.classList.add('disconnected');
+  }
+  const dpText = $('discoveryText');
+  if (dpText) {
+    if (status === 'online') dpText.innerHTML = `已连接: <strong style="color:var(--mc-green)">${state.peerName || '对端'}</strong>`;
+    else if (status === 'connecting') dpText.innerHTML = `正在与 <strong>${state.peerName || '对端'}</strong> 建立连接...`;
+    else dpText.innerHTML = `正在广播发现信号... 房间: <strong id="discoveryRoom">${state.room}</strong>`;
+  }
+
+  $('btnStartSend').disabled = !(state.connected && state.sendQueue.length > 0 && !state.sending);
+  $('btnDisconnect').disabled = !state.connected && !state.rtc;
+}
+
+// ===== WebRTC Core =====
+function createRTC() {
+  if (state.rtc) { try { state.rtc.close(); } catch(e) {} }
+  const rtc = new RTCPeerConnection({ iceServers: state.iceServers });
+  state.rtc = rtc;
+
+  rtc.onconnectionstatechange = () => {
+    log(`RTC状态: ${rtc.connectionState}`, rtc.connectionState === 'connected' ? 'ok' : 'info');
+    if (rtc.connectionState === 'connected') {
+      setConnStatus('online', '已连接');
+    } else if (rtc.connectionState === 'connecting' || rtc.connectionState === 'checking') {
+      setConnStatus('connecting', '连接中...');
+    } else if (rtc.connectionState === 'failed' || rtc.connectionState === 'disconnected' || rtc.connectionState === 'closed') {
+      setConnStatus('offline', '已断开');
+      if (state.dataChannel) { try { state.dataChannel.close(); } catch(e) {} state.dataChannel = null; }
+    }
+  };
+
+  rtc.oniceconnectionstatechange = () => {
+    log(`ICE状态: ${rtc.iceConnectionState}`, 'data');
+  };
+
+  rtc.ondatachannel = (e) => {
+    log('收到数据通道', 'ok');
+    setupDataChannel(e.channel);
+  };
+
+  return rtc;
+}
+
+function setupDataChannel(dc) {
+  state.dataChannel = dc;
+  dc.binaryType = 'arraybuffer';
+
+  dc.onopen = () => {
+    log('数据通道已打开', 'ok');
+    setConnStatus('online', '已连接');
+    sendCtrl({ t: 'hello', name: state.deviceName });
+  };
+
+  dc.onclose = () => {
+    log('数据通道已关闭', 'warn');
+    setConnStatus('offline', '已断开');
+  };
+
+  dc.onerror = (e) => {
+    log(`数据通道错误: ${e.error?.message || 'unknown'}`, 'err');
+    beepError();
+  };
+
+  dc.onmessage = (e) => handleMessage(e.data);
+}
+
+async function waitForIce(rtc) {
+  return new Promise(resolve => {
+    if (rtc.iceGatheringState === 'complete') return resolve();
+    const check = () => {
+      if (rtc.iceGatheringState === 'complete') {
+        rtc.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      }
+    };
+    rtc.addEventListener('icegatheringstatechange', check);
+    setTimeout(resolve, 8000); // 8s timeout
+  });
+}
+
+// ===== BroadcastChannel LAN Discovery =====
+function initBroadcast() {
+  if (state.bc) { try { state.bc.close(); } catch(e) {} }
+  const channelName = BROADCAST_CHANNEL_PREFIX + state.room;
+  try {
+    state.bc = new BroadcastChannel(channelName);
+    state.bc.onmessage = (e) => handleBroadcastMsg(e.data);
+    log(`广播通道已开启: ${channelName}`, 'ok');
+    broadcastPresence();
+  } catch(err) {
+    log(`广播通道不可用: ${err.message}`, 'warn');
+    $('discoveryPanel').style.display = 'none';
+  }
+}
+
+function broadcastPresence() {
+  if (!state.bc) return;
+  state.bc.postMessage({
+    t: 'hello',
+    from: state.bcId,
+    name: state.deviceName,
+    ts: Date.now(),
+  });
+}
+
+// handleBroadcastMsg is defined below (complete version with ICE support)
+
+function renderBroadcastPeers() {
+  const container = $('peerList');
+  container.innerHTML = '';
+  const peers = Array.from(state.bcPeers.entries());
+  if (peers.length === 0) {
+    container.innerHTML = '<div class="text-gray small-pixel">当前房间内没有其他设备</div>';
+    return;
+  }
+  for (const [id, info] of peers) {
+    const item = el('div', { class: 'broadcast-peer' });
+    const avatar = el('div', { class: 'bp-avatar', text: info.name.charAt(0).toUpperCase() });
+    const infoDiv = el('div', { class: 'bp-info' });
+    infoDiv.appendChild(el('div', { class: 'bp-name', text: info.name }));
+    infoDiv.appendChild(el('div', { class: 'bp-meta', text: `ID: ${id.substr(0,8)} | 同房间广播发现` }));
+    item.appendChild(avatar);
+    item.appendChild(infoDiv);
+    const badge = el('span', { class: 'bp-badge', text: '在线' });
+    item.appendChild(badge);
+    const btn = el('button', { class: 'btn btn-green btn-small', text: '连接' });
+    btn.addEventListener('click', () => initiateBroadcastConnect(id, info.name));
+    item.appendChild(btn);
+    container.appendChild(item);
+  }
+}
+
+// Heartbeat to keep presence alive and detect departures
+setInterval(() => {
+  if (state.bc && state.connectMethod === 'broadcast') {
+    broadcastPresence();
+    // Clean stale peers (not seen in 10s)
+    const now = Date.now();
+    let changed = false;
+    for (const [id, info] of state.bcPeers) {
+      if (now - info.lastSeen > 10000) {
+        state.bcPeers.delete(id);
+        changed = true;
+        log(`设备超时离开: ${info.name}`, 'warn');
+      }
+    }
+    if (changed) renderBroadcastPeers();
+  }
+}, BROADCAST_HEARTBEAT);
+
+// Announce departure
+window.addEventListener('beforeunload', () => {
+  if (state.bc) {
+    try { state.bc.postMessage({ t: 'bye', from: state.bcId }); } catch(e) {}
+  }
+});
+
+// ===== Broadcast-based WebRTC Signaling =====
+// This is the key feature: use BroadcastChannel to relay SDP offers/answers
+// so two tabs/devices on the same network can connect without a server.
+// NOTE: BroadcastChannel only works between tabs on the same browser/device.
+// For cross-device LAN connection, we need a different approach (see below).
+
+async function initiateBroadcastConnect(peerId, peerName) {
+  try {
+    log(`向 ${peerName} 发起连接...`, 'info');
+    const rtc = createRTC();
+
+    // Relay ICE candidates via broadcast
+    rtc.onicecandidate = (e) => {
+      if (e.candidate && state.bc) {
+        state.bc.postMessage({
+          t: 'ice-broadcast',
+          to: peerId,
+          from: state.bcId,
+          candidate: e.candidate,
+        });
+      }
+    };
+
+    const dc = rtc.createDataChannel('ghc');
+    setupDataChannel(dc);
+
+    const offer = await rtc.createOffer();
+    await rtc.setLocalDescription(offer);
+
+    // Send offer via broadcast
+    state.bc.postMessage({
+      t: 'offer-broadcast',
+      to: peerId,
+      from: state.bcId,
+      name: state.deviceName,
+      sdp: rtc.localDescription,
+    });
+
+    state.peerName = peerName;
+    $('infoPeer').textContent = peerName;
+    $('sbPeer').textContent = '对端: ' + peerName;
+    setConnStatus('connecting', '连接中...');
+    log(`已发送连接邀请给 ${peerName}`, 'info');
+  } catch(err) {
+    log(`发起连接失败: ${err.message}`, 'err');
+    beepError();
+  }
+}
+
+async function handleBroadcastOfferRelay(msg) {
+  // We received an offer from a peer via broadcast
+  try {
+    log(`收到 ${msg.name} 的连接邀请`, 'info');
+    state.peerName = msg.name;
+    $('infoPeer').textContent = msg.name;
+    $('sbPeer').textContent = '对端: ' + msg.name;
+
+    const rtc = createRTC();
+    rtc.onicecandidate = (e) => {
+      if (e.candidate && state.bc) {
+        state.bc.postMessage({
+          t: 'ice-broadcast',
+          to: msg.from,
+          from: state.bcId,
+          candidate: e.candidate,
+        });
+      }
+    };
+
+    await rtc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+    const answer = await rtc.createAnswer();
+    await rtc.setLocalDescription(answer);
+
+    // Send answer via broadcast
+    state.bc.postMessage({
+      t: 'answer-broadcast',
+      to: msg.from,
+      from: state.bcId,
+      name: state.deviceName,
+      sdp: rtc.localDescription,
+    });
+
+    setConnStatus('connecting', '连接中...');
+    log(`已回应 ${msg.name} 的连接邀请`, 'ok');
+  } catch(err) {
+    log(`处理连接邀请失败: ${err.message}`, 'err');
+  }
+}
+
+async function handleBroadcastAnswerRelay(msg) {
+  try {
+    if (!state.rtc) return;
+    await state.rtc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+    log(`收到 ${msg.name} 的应答，正在建立连接...`, 'ok');
+  } catch(err) {
+    log(`处理应答失败: ${err.message}`, 'err');
+  }
+}
+
+// Handle ICE candidates from broadcast
+async function handleBroadcastMsg(msg) {
+  if (!msg || msg.from === state.bcId) return;
+
+  if (msg.t === 'hello') {
+    const isNew = !state.bcPeers.has(msg.from);
+    state.bcPeers.set(msg.from, { name: msg.name, lastSeen: Date.now() });
+    if (isNew) {
+      log(`发现设备: ${msg.name}`, 'ok');
+      renderBroadcastPeers();
+    } else {
+      // Update lastSeen
+      state.bcPeers.get(msg.from).lastSeen = Date.now();
+    }
+  } else if (msg.t === 'bye') {
+    if (state.bcPeers.has(msg.from)) {
+      log(`设备离开: ${state.bcPeers.get(msg.from).name}`, 'warn');
+      state.bcPeers.delete(msg.from);
+      renderBroadcastPeers();
+    }
+  } else if (msg.t === 'offer-broadcast') {
+    handleBroadcastOfferRelay(msg);
+  } else if (msg.t === 'answer-broadcast') {
+    handleBroadcastAnswerRelay(msg);
+  } else if (msg.t === 'ice-broadcast') {
+    handleBroadcastIceRelay(msg);
+  }
+}
+
+async function handleBroadcastIceRelay(msg) {
+  try {
+    if (!state.rtc || !msg.candidate) return;
+    await state.rtc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+  } catch(err) {
+    log(`添加ICE候选失败: ${err.message}`, 'err');
+  }
+}
+
+// ===== Connection Method Selection =====
+$('methodBroadcast').addEventListener('click', () => {
+  state.connectMethod = 'broadcast';
+  $('methodBroadcast').classList.add('selected');
+  $('methodManual').classList.remove('selected');
+  $('broadcastPanel').classList.remove('hidden');
+  $('manualPanel').classList.add('hidden');
+  $('discoveryPanel').style.display = '';
+  log('已切换到: 局域网自动发现', 'info');
+});
+
+$('methodManual').addEventListener('click', () => {
+  state.connectMethod = 'manual';
+  $('methodManual').classList.add('selected');
+  $('methodBroadcast').classList.remove('selected');
+  $('broadcastPanel').classList.add('hidden');
+  $('manualPanel').classList.remove('hidden');
+  $('discoveryPanel').style.display = 'none';
+  log('已切换到: 手动密钥交换', 'info');
+});
+
+// ===== Room switching =====
+$('btnChangeRoom').addEventListener('click', () => {
+  const newRoom = $('roomInput').value.trim() || 'GHC-001';
+  state.room = newRoom;
+  $('infoRoom').textContent = newRoom;
+  $('topbarRoom').textContent = '房间: ' + newRoom;
+  $('discoveryRoom').textContent = newRoom;
+  state.bcPeers.clear();
+  renderBroadcastPeers();
+  initBroadcast();
+  log(`已切换到房间: ${newRoom}`, 'ok');
+});
+
+// ===== Manual SDP =====
+$('btnGenOffer').addEventListener('click', async () => {
+  try {
+    log('创建连接邀请...', 'info');
+    const rtc = createRTC();
+    const dc = rtc.createDataChannel('ghc');
+    setupDataChannel(dc);
+
+    const offer = await rtc.createOffer();
+    await rtc.setLocalDescription(offer);
+    await waitForIce(rtc);
+
+    const payload = {
+      protocol: SIGNAL_PROTOCOL,
+      type: 'offer',
+      name: state.deviceName,
+      sdp: rtc.localDescription,
+    };
+    const encoded = btoa(JSON.stringify(payload));
+    $('txtOffer').value = encoded;
+    log('邀请密钥已生成，发送给对方', 'ok');
+    beepNotify();
+  } catch(err) {
+    log(`生成邀请失败: ${err.message}`, 'err');
+    beepError();
+  }
+});
+
+$('btnCopyOffer').addEventListener('click', () => {
+  const v = $('txtOffer').value;
+  if (!v) return;
+  navigator.clipboard.writeText(v).then(() => {
+    log('邀请密钥已复制到剪贴板', 'ok');
+  }).catch(() => log('复制失败，请手动复制', 'warn'));
+});
+
+$('btnApplyAnswer').addEventListener('click', async () => {
+  try {
+    const encoded = $('txtAnswer').value.trim();
+    if (!encoded) { log('请先粘贴密钥', 'warn'); return; }
+    const payload = JSON.parse(atob(encoded));
+
+    if (payload.type === 'answer') {
+      // We are the offerer, applying remote answer
+      const rtc = state.rtc || createRTC();
+      await rtc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+      log('应答已应用，正在建立连接...', 'ok');
+      setConnStatus('connecting', '连接中...');
+    } else if (payload.type === 'offer') {
+      // We are the answerer
+      state.peerName = payload.name || '未知设备';
+      $('infoPeer').textContent = state.peerName;
+      $('sbPeer').textContent = '对端: ' + state.peerName;
+
+      const rtc = createRTC();
+      await rtc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+      const answer = await rtc.createAnswer();
+      await rtc.setLocalDescription(answer);
+      await waitForIce(rtc);
+
+      const resp = { protocol: SIGNAL_PROTOCOL, type: 'answer', name: state.deviceName, sdp: rtc.localDescription };
+      $('txtAnswer').value = btoa(JSON.stringify(resp));
+      $('txtAnswer').readOnly = true;
+      log('应答密钥已生成，发送给对方', 'ok');
+      beepNotify();
+      setConnStatus('connecting', '连接中...');
+    } else {
+      log('无效的密钥格式', 'err');
+    }
+  } catch(err) {
+    log(`处理密钥失败: ${err.message}`, 'err');
+    beepError();
+  }
+});
+
+// SDP mode change
+$('sdpMode').addEventListener('change', () => {
+  const isOffer = $('sdpMode').value === 'offer';
+  $('sdpStep1').style.display = isOffer ? '' : 'none';
+  $('sdpStep2').style.display = isOffer ? '' : 'none';
+  if (!isOffer) {
+    $('txtOffer').value = '';
+    $('txtOffer').placeholder = '切换到发起方模式可生成邀请密钥';
+    $('txtOffer').readOnly = false;
+    $('sdpStep2Label').textContent = '粘贴对方发来的邀请密钥';
+    $('txtAnswer').placeholder = '在此粘贴对方的邀请密钥...';
+    $('txtAnswer').readOnly = false;
+    $('btnApplyAnswer').textContent = '生成应答密钥';
+    $('btnApplyAnswer').disabled = false;
+  } else {
+    $('txtAnswer').value = '';
+    $('btnApplyAnswer').textContent = '确认并连接';
+  }
+});
+
+// ===== Quick Connect =====
+$('btnQuickConnect').addEventListener('click', () => {
+  document.querySelector('[data-page="page-connect"]').click();
+  // Default to broadcast method
+  $('methodBroadcast').click();
+  log('请在"建立连接"页面选择目标设备', 'info');
+});
+
+$('btnDisconnect').addEventListener('click', () => {
+  if (state.dataChannel) { try { state.dataChannel.close(); } catch(e) {} state.dataChannel = null; }
+  if (state.rtc) { try { state.rtc.close(); } catch(e) {} state.rtc = null; }
+  state.sendQueue = [];
+  state.sending = false;
+  setConnStatus('offline', '已断开');
+  log('连接已手动断开', 'warn');
+  updateSendListUI();
+  $('btnStartSend').disabled = true;
+});
+
+// ===== File Selection & Drag-Drop =====
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+  addFiles(Array.from(e.target.files));
+  fileInput.value = '';
+});
+
+['dragenter', 'dragover'].forEach(evt =>
+  dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+  dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); })
+);
+dropZone.addEventListener('drop', (e) => {
+  addFiles(Array.from(e.dataTransfer.files));
+});
+
+['dragover', 'drop'].forEach(evt =>
+  document.addEventListener(evt, (e) => { if (e.target !== dropZone) e.preventDefault(); }, false)
+);
+
+function addFiles(files) {
+  for (const f of files) {
+    if (f.size > MAX_FILE_SIZE) {
+      log(`文件过大 (${fmtSize(f.size)}), 跳过: ${f.name}`, 'warn');
+      continue;
+    }
+    state.sendQueue.push({
+      file: f, name: f.name, size: f.size,
+      type: f.type || 'application/octet-stream',
+      status: 'queued', progress: 0,
+    });
+    log(`已添加: ${f.name} (${fmtSize(f.size)})`, 'info');
+  }
+  updateSendListUI();
+  updateBadges();
+  $('btnStartSend').disabled = !(state.connected && state.sendQueue.length > 0 && !state.sending);
+}
+
+function updateSendListUI() {
+  const container = $('sendFileList');
+  container.innerHTML = '';
+  for (let i = 0; i < state.sendQueue.length; i++) {
+    const item = state.sendQueue[i];
+    const div = el('div', { class: 'file-item' });
+    div.innerHTML = `${fileIconSvg(item.name)}
+      <div class="fi-info">
+        <div class="fi-name">${item.name}</div>
+        <div class="fi-size">${fmtSize(item.size)}</div>
+      </div>
+      <span class="fi-status ${item.status}">${statusText(item.status)}</span>`;
+    const delBtn = el('button', { class: 'btn btn-red btn-small', text: 'X' });
+    delBtn.addEventListener('click', () => {
+      if (state.sending && state.currentSend?.index === i) { log('正在发送中，无法删除', 'warn'); return; }
+      state.sendQueue.splice(i, 1);
+      updateSendListUI();
+      updateBadges();
+    });
+    div.appendChild(delBtn);
+    container.appendChild(div);
+  }
+}
+
+function statusText(s) {
+  const m = { queued:'等待', sending:'发送中', done:'完成', error:'错误', receiving:'接收中' };
+  return m[s] || s;
+}
+
+function updateBadges() {
+  const sendBadge = $('sendBadge');
+  sendBadge.textContent = state.sendQueue.length;
+  sendBadge.classList.toggle('show', state.sendQueue.length > 0);
+  const recvBadge = $('recvBadge');
+  recvBadge.textContent = state.recvBuffers.size;
+  recvBadge.classList.toggle('show', state.recvBuffers.size > 0);
+}
+
+// ===== Sending Files =====
+$('btnStartSend').addEventListener('click', () => {
+  if (!state.connected) { log('请先建立连接', 'warn'); return; }
+  if (state.sendQueue.length === 0) { log('没有待发送文件', 'warn'); return; }
+  if (state.sending) { log('正在发送中...', 'warn'); return; }
+  startSending();
+});
+
+$('btnClearSend').addEventListener('click', () => {
+  if (state.sending) { log('正在发送中，无法清空', 'warn'); return; }
+  state.sendQueue = [];
+  updateSendListUI();
+  updateBadges();
+  $('btnStartSend').disabled = true;
+  log('发送列表已清空', 'info');
+});
+
+async function startSending() {
+  state.sending = true;
+  $('btnStartSend').disabled = true;
+
+  for (let i = 0; i < state.sendQueue.length; i++) {
+    if (!state.connected) break;
+    const item = state.sendQueue[i];
+    if (item.status === 'done') continue;
+    item.status = 'sending';
+    state.currentSend = { index: i, item, startTime: Date.now(), lastUpdate: Date.now(), lastBytes: 0 };
+    updateSendListUI();
+    showActiveSend(item);
+
+    try {
+      await sendFile(item);
+      item.status = 'done';
+      const dur = Date.now() - state.currentSend.startTime;
+      const speed = item.size / (dur / 1000);
+      addHistory({ name: item.name, size: item.size, dir: 'send', status: 'done', dur, speed });
+      log(`发送完成: ${item.name} (${fmtSize(item.size)}, ${fmtSpeed(speed)})`, 'ok');
+      beepComplete();
+    } catch(err) {
+      item.status = 'error';
+      log(`发送失败: ${item.name} - ${err.message}`, 'err');
+      beepError();
+    }
+
+    hideActiveSend();
+    updateSendListUI();
+  }
+
+  state.sending = false;
+  state.currentSend = null;
+  $('btnStartSend').disabled = !(state.connected && state.sendQueue.length > 0);
+  updateBadges();
+  log('所有文件处理完毕', 'ok');
+}
+
+function sendFile(item) {
+  return new Promise(async (resolve, reject) => {
+    const file = item.file;
+    const chunkSize = state.chunkSize;
+    const totalChunks = Math.ceil(file.size / chunkSize);
+
+    sendCtrl({ t: 'file-start', name: file.name, size: file.size, type: file.type || 'application/octet-stream', totalChunks, chunkSize });
+
+    let offset = 0;
+
+    const sendNext = async () => {
+      if (offset >= file.size) {
+        while (state.dataChannel && state.dataChannel.bufferedAmount > 0) {
+          await sleep(50);
+          if (!state.connected) { reject(new Error('连接已断开')); return; }
+        }
+        sendCtrl({ t: 'file-end', name: file.name });
+        resolve();
+        return;
+      }
+      if (!state.connected || !state.dataChannel) { reject(new Error('连接已断开')); return; }
+
+      const slice = file.slice(offset, offset + chunkSize);
+      const buffer = await slice.arrayBuffer();
+
+      while (state.dataChannel.bufferedAmount > state.backpressure) {
+        await sleep(50);
+        if (!state.connected) { reject(new Error('连接已断开')); return; }
+      }
+
+      try {
+        state.dataChannel.send(buffer);
+        state.bytesSent += buffer.byteLength;
+        offset += buffer.byteLength;
+
+        const progress = Math.min(100, (offset / file.size) * 100);
+        item.progress = progress;
+        updateSendProgress(offset, file.size);
+
+        $('sbSent').textContent = '发送: ' + fmtSize(state.bytesSent);
+        $('infoSent').textContent = fmtSize(state.bytesSent);
+
+        setTimeout(sendNext, 0);
+      } catch(err) {
+        reject(err);
+      }
+    };
+
+    sendNext();
+  });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showActiveSend(item) {
+  $('activeSend').classList.remove('hidden');
+  $('activeSendName').textContent = item.name + '  (' + fmtSize(item.size) + ')';
+  $('activeSendBar').style.width = '0%';
+  $('activeSendPct').textContent = '0%';
+  $('activeSendSize').textContent = '0 / ' + fmtSize(item.size);
+  $('activeSendSpeed').textContent = '-- MB/s';
+  $('activeSendEta').textContent = '--';
+}
+
+function hideActiveSend() { $('activeSend').classList.add('hidden'); }
+
+function updateSendProgress(sent, total) {
+  const pct = Math.min(100, (sent / total) * 100);
+  $('activeSendBar').style.width = pct.toFixed(1) + '%';
+  $('activeSendPct').textContent = pct.toFixed(1) + '%';
+  $('activeSendSize').textContent = fmtSize(sent) + ' / ' + fmtSize(total);
+  if (state.currentSend) {
+    const now = Date.now();
+    const elapsed = (now - state.currentSend.startTime) / 1000;
+    if (elapsed > 0) {
+      const speed = sent / elapsed;
+      $('activeSendSpeed').textContent = fmtSpeed(speed);
+      const remaining = (total - sent) / speed;
+      $('activeSendEta').textContent = fmtEta(remaining * 1000);
+    }
+  }
+}
+
+// ===== Receiving Files =====
+function showActiveRecv(meta) {
+  $('recvEmpty').style.display = 'none';
+  $('activeRecv').classList.remove('hidden');
+  $('activeRecvName').textContent = meta.name + '  (' + fmtSize(meta.size) + ')';
+  $('activeRecvBar').style.width = '0%';
+  $('activeRecvPct').textContent = '0%';
+  $('activeRecvSize').textContent = '0 / ' + fmtSize(meta.size);
+  $('activeRecvSpeed').textContent = '-- MB/s';
+  $('activeRecvEta').textContent = '--';
+}
+
+function updateRecvProgress(received, total) {
+  const pct = Math.min(100, (received / total) * 100);
+  $('activeRecvBar').style.width = pct.toFixed(1) + '%';
+  $('activeRecvPct').textContent = pct.toFixed(1) + '%';
+  $('activeRecvSize').textContent = fmtSize(received) + ' / ' + fmtSize(total);
+  if (state.recvMeta && state.recvMeta._startTime) {
+    const elapsed = (Date.now() - state.recvMeta._startTime) / 1000;
+    if (elapsed > 0) {
+      const speed = received / elapsed;
+      $('activeRecvSpeed').textContent = fmtSpeed(speed);
+      const remaining = (total - received) / speed;
+      $('activeRecvEta').textContent = fmtEta(remaining * 1000);
+    }
+  }
+}
+
+function hideActiveRecv() { $('activeRecv').classList.add('hidden'); }
+
+function addRecvFileToList(meta) {
+  const container = $('recvFileList');
+  const div = el('div', { class: 'file-item', id: 'recv-' + meta._id });
+  div.innerHTML = `${fileIconSvg(meta.name)}
+    <div class="fi-info">
+      <div class="fi-name">${meta.name}</div>
+      <div class="fi-size">${fmtSize(meta.size)}</div>
+    </div>
+    <span class="fi-status receiving">接收中</span>`;
+  container.appendChild(div);
+}
+
+function finalizeRecvFile(meta, buffers) {
+  const blob = new Blob(buffers, { type: meta.type });
+  const url = URL.createObjectURL(blob);
+
+  const item = document.getElementById('recv-' + meta._id);
+  if (item) {
+    const status = item.querySelector('.fi-status');
+    status.className = 'fi-status done';
+    status.textContent = '完成';
+    const dlBtn = el('button', { class: 'btn btn-green btn-small', text: '下载' });
+    dlBtn.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = url; a.download = meta.name; a.click();
+    });
+    item.appendChild(dlBtn);
+  }
+
+  const dur = Date.now() - meta._startTime;
+  const speed = meta.size / (dur / 1000);
+  addHistory({ name: meta.name, size: meta.size, dir: 'recv', status: 'done', dur, speed });
+  log(`接收完成: ${meta.name} (${fmtSize(meta.size)}, ${fmtSpeed(speed)})`, 'ok');
+  beepComplete();
+
+  $('sbRecv').textContent = '接收: ' + fmtSize(state.bytesRecv);
+  $('infoRecv').textContent = fmtSize(state.bytesRecv);
+}
+
+// ===== Message Handling =====
+function sendCtrl(obj) {
+  if (state.dataChannel && state.dataChannel.readyState === 'open') {
+    state.dataChannel.send(JSON.stringify(obj));
+  }
+}
+
+function handleMessage(data) {
+  if (typeof data === 'string') {
+    try { handleCtrl(JSON.parse(data)); }
+    catch(e) { log(`控制消息解析失败: ${e.message}`, 'err'); }
+  } else {
+    handleChunk(data);
+  }
+}
+
+function handleCtrl(msg) {
+  switch (msg.t) {
+    case 'hello':
+      log(`对端设备: ${msg.name}`, 'ok');
+      state.peerName = msg.name;
+      $('infoPeer').textContent = msg.name;
+      $('sbPeer').textContent = '对端: ' + msg.name;
+      sendCtrl({ t: 'hello-ack', name: state.deviceName });
+      break;
+    case 'hello-ack':
+      log(`对端确认: ${msg.name}`, 'ok');
+      state.peerName = msg.name;
+      $('infoPeer').textContent = msg.name;
+      $('sbPeer').textContent = '对端: ' + msg.name;
+      break;
+    case 'file-start':
+      log(` incoming: ${msg.name} (${fmtSize(msg.size)})`, 'info');
+      beepNotify();
+      const meta = {
+        _id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        name: msg.name, size: msg.size, type: msg.type,
+        _startTime: Date.now(), _received: 0,
+      };
+      state.recvMeta = meta;
+      state.recvBuffers.set(meta._id, []);
+      showActiveRecv(meta);
+      addRecvFileToList(meta);
+      updateBadges();
+      break;
+    case 'file-end':
+      if (state.recvMeta) {
+        const buffers = state.recvBuffers.get(state.recvMeta._id) || [];
+        finalizeRecvFile(state.recvMeta, buffers);
+        state.recvBuffers.delete(state.recvMeta._id);
+        state.recvMeta = null;
+        hideActiveRecv();
+        updateBadges();
+      }
+      break;
+    case 'file-cancel':
+      log('对方取消了文件传输', 'warn');
+      beepError();
+      break;
+  }
+}
+
+function handleChunk(buffer) {
+  if (!state.recvMeta) return;
+  const meta = state.recvMeta;
+  const buffers = state.recvBuffers.get(meta._id);
+  if (!buffers) return;
+
+  buffers.push(buffer);
+  meta._received += buffer.byteLength;
+  state.bytesRecv += buffer.byteLength;
+
+  updateRecvProgress(meta._received, meta.size);
+  $('sbRecv').textContent = '接收: ' + fmtSize(state.bytesRecv);
+
+  if (meta._received >= meta.size) {
+    setTimeout(() => {
+      if (state.recvBuffers.has(meta._id)) {
+        log('file-end 未收到，自动完成', 'warn');
+        finalizeRecvFile(meta, buffers);
+        state.recvBuffers.delete(meta._id);
+        if (state.recvMeta?._id === meta._id) state.recvMeta = null;
+        hideActiveRecv();
+        updateBadges();
+      }
+    }, 2000);
+  }
+}
+
+// ===== History =====
+function addHistory(entry) {
+  entry.time = Date.now();
+  state.history.unshift(entry);
+  if (state.history.length > 200) state.history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const tbody = $('historyBody');
+  tbody.innerHTML = '';
+  for (const h of state.history) {
+    const tr = el('tr');
+    const time = new Date(h.time).toTimeString().slice(0, 8);
+    const dur = h.dur ? (h.dur / 1000).toFixed(1) + 's' : '--';
+    const speed = h.speed ? fmtSpeed(h.speed) : '--';
+    const dirTag = h.dir === 'send' ? '<span class="tag tag-send">发送</span>' : '<span class="tag tag-recv">接收</span>';
+    const statusTag = h.status === 'done' ? '<span class="tag tag-done">成功</span>' : '<span class="tag tag-fail">失败</span>';
+    tr.innerHTML = `<td>${time}</td><td>${h.name}</td><td>${fmtSize(h.size)}</td><td>${dirTag}</td><td>${statusTag}</td><td>${dur}</td><td>${speed}</td>`;
+    tbody.appendChild(tr);
+  }
+  $('historyCount').textContent = `共 ${state.history.length} 条记录`;
+}
+
+$('btnClearHistory').addEventListener('click', () => {
+  state.history = []; renderHistory(); log('传输记录已清空', 'info');
+});
+
+// ===== Settings Persistence =====
+const SETTINGS_KEY = 'ghc_settings_v3';
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.deviceName) { state.deviceName = s.deviceName; $('setDevName').value = s.deviceName; $('sidebarDevInput').value = s.deviceName; }
+    if (s.chunkSize) { state.chunkSize = s.chunkSize; $('setChunkSize').value = s.chunkSize; }
+    if (s.backpressure) { state.backpressure = s.backpressure; $('setBackpressure').value = s.backpressure; }
+    if (s.signalUrl) { state.signalUrl = s.signalUrl; $('setSignalUrl').value = s.signalUrl; }
+    if (s.room) { state.room = s.room; $('setRoom').value = s.room; $('roomInput').value = s.room; $('discoveryRoom').textContent = s.room; }
+    if (s.audioEnabled !== undefined) { state.audioEnabled = s.audioEnabled; $('setAudio').value = s.audioEnabled ? 'on' : 'off'; }
+    if (s.iceServers) { state.iceServers = s.iceServers; $('setIceServers').value = JSON.stringify(s.iceServers, null, 2); }
+    log('已加载保存的设置', 'ok');
+  } catch(e) { log(`加载设置失败: ${e.message}`, 'warn'); }
+}
+
+function saveSettings() {
+  try {
+    const s = {
+      deviceName: $('setDevName').value.trim() || state.deviceName,
+      chunkSize: parseInt($('setChunkSize').value),
+      backpressure: parseInt($('setBackpressure').value),
+      signalUrl: $('setSignalUrl').value.trim(),
+      room: $('setRoom').value.trim(),
+      audioEnabled: $('setAudio').value === 'on',
+      iceServers: JSON.parse($('setIceServers').value || '[]'),
+    };
+    state.deviceName = s.deviceName;
+    state.chunkSize = s.chunkSize;
+    state.backpressure = s.backpressure;
+    state.audioEnabled = s.audioEnabled;
+    if (s.iceServers.length > 0) state.iceServers = s.iceServers;
+    if (s.signalUrl) state.signalUrl = s.signalUrl;
+    if (s.room) { state.room = s.room; $('roomInput').value = s.room; $('discoveryRoom').textContent = s.room; }
+
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    updateDeviceName();
+    $('sidebarDevInput').value = s.deviceName;
+    log('设置已保存', 'ok');
+    beepNotify();
+
+    // Re-init broadcast with new room
+    initBroadcast();
+  } catch(e) { log(`保存设置失败: ${e.message}`, 'err'); beepError(); }
+}
+
+$('btnSaveSettings').addEventListener('click', saveSettings);
+
+$('btnExportSettings').addEventListener('click', () => {
+  const s = { deviceName: state.deviceName, chunkSize: state.chunkSize, backpressure: state.backpressure, signalUrl: state.signalUrl, room: state.room, audioEnabled: state.audioEnabled, iceServers: state.iceServers };
+  const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ghc-config.json'; a.click();
+  log('配置已导出', 'ok');
+});
+
+$('btnImportSettings').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const s = JSON.parse(reader.result);
+      if (s.deviceName) $('setDevName').value = s.deviceName;
+      if (s.chunkSize) $('setChunkSize').value = s.chunkSize;
+      if (s.backpressure) $('setBackpressure').value = s.backpressure;
+      if (s.signalUrl) $('setSignalUrl').value = s.signalUrl;
+      if (s.room) { $('setRoom').value = s.room; $('roomInput').value = s.room; $('discoveryRoom').textContent = s.room; }
+      if (s.audioEnabled !== undefined) $('setAudio').value = s.audioEnabled ? 'on' : 'off';
+      if (s.iceServers) $('setIceServers').value = JSON.stringify(s.iceServers, null, 2);
+      log('配置已导入，点击保存生效', 'ok'); beepNotify();
+    } catch(err) { log(`导入失败: ${err.message}`, 'err'); }
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+});
+
+// ===== Status Bar Timer =====
+function startTimer() {
+  state.timerInterval = setInterval(() => {
+    $('sbTime').textContent = fmtTime(Date.now() - state.startTime);
+  }, 1000);
+}
+
+// ===== Environment Detection =====
+function detectEnvironment() {
+  const proto = window.location.protocol;
+  const isHttps = proto === 'https:';
+  const isFile = proto === 'file:';
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isGithubPages = window.location.hostname.endsWith('github.io');
+
+  state.env = { isHttps, isFile, isLocalhost, isGithubPages, proto };
+
+  if (isFile) {
+    log('运行环境: 本地文件 (file://)', 'warn');
+    log('提示: 本地文件可直接使用，推荐用Chrome/Edge打开', 'info');
+  } else if (isHttps) {
+    log(`运行环境: HTTPS (${window.location.hostname})`, 'ok');
+    log('提示: HTTPS下BroadcastChannel正常工作', 'info');
+  } else if (isLocalhost) {
+    log('运行环境: 本地服务器 (localhost)', 'ok');
+  } else {
+    log(`运行环境: ${proto}//${window.location.hostname}`, 'info');
+  }
+
+  // Check BroadcastChannel support
+  if (typeof BroadcastChannel === 'undefined') {
+    log('警告: 当前浏览器不支持BroadcastChannel', 'warn');
+    log('请使用Chrome 54+ / Firefox 44+ / Edge 79+', 'warn');
+  }
+
+  // Check WebRTC support
+  if (typeof RTCPeerConnection === 'undefined') {
+    log('错误: 当前浏览器不支持WebRTC', 'err');
+  }
+
+  // Check if opened from GitHub Pages
+  if (isGithubPages) {
+    log('检测到GitHub Pages托管版本', 'info');
+    log('注意: 两人需打开同一URL才能通过BroadcastChannel发现', 'info');
+  }
+}
+
+// ===== Init =====
+function init() {
+  detectEnvironment();
+  loadSettings();
+  updateDeviceName();
+  $('infoRoom').textContent = state.room;
+  $('topbarRoom').textContent = '房间: ' + state.room;
+  $('discoveryRoom').textContent = state.room;
+  setConnStatus('offline', '未连接');
+  log('GHC v3.0.0 已就绪', 'ok');
+  log(`设备名: ${state.deviceName}`, 'info');
+  log(`分块大小: ${fmtSize(state.chunkSize)} | 背压: ${fmtSize(state.backpressure)}`, 'data');
+  log('提示: 进入"建立连接"页面选择连接方式', 'info');
+  startTimer();
+  renderHistory();
+  renderBroadcastPeers();
+  initBroadcast();
+}
+
+// Paste SDP detection
+document.addEventListener('paste', (e) => {
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if (text && text.length > 20 && document.querySelector('.page.active')?.id === 'page-connect') {
+    try {
+      const parsed = JSON.parse(atob(text.trim()));
+      if (parsed.protocol === SIGNAL_PROTOCOL) {
+        $('txtAnswer').value = text.trim();
+        log('检测到密钥已粘贴，准备处理...', 'info');
+      }
+    } catch(e) {}
+  }
+});
+
+// Warn before unload
+window.addEventListener('beforeunload', (e) => {
+  if (state.sending) {
+    e.preventDefault();
+    e.returnValue = '文件正在传输中，确定要离开吗？';
+    return e.returnValue;
+  }
+});
+
+// Boot
+init();
+
+</script>
+</body>
+</html>
