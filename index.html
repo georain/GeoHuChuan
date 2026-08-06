@@ -2,10 +2,17 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GHC - 局域网文件互传</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>GHC 传 - 局域网文件互传</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  /* ===== Pixel Font (内嵌精简版) ===== */
+  @font-face {
+    font-family: 'PressStart2P';
+    src: url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    font-display: swap;
+  }
 
   :root {
     --mc-green:      #5cce63;
@@ -28,8 +35,8 @@
     --mc-grass:      #4a8c2a;
     --mc-shadow:     4px 4px 0 #000;
     --mc-shadow-sm:  2px 2px 0 #000;
-    --font-pixel:    'Press Start 2P', 'WenQuanYi Micro Hei', monospace;
-    --font-ui:       'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    --font-pixel:    'Press Start 2P', 'WenQuanYi Micro Hei', 'SimHei', monospace;
+    --font-ui:       'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,6 +48,8 @@
     color: var(--mc-gray-light);
     image-rendering: pixelated;
     -webkit-font-smoothing: none;
+    -webkit-tap-highlight-color: transparent;
+    font-size: 14px;
   }
 
   /* Block texture background */
@@ -59,11 +68,11 @@
     opacity: 0.6;
   }
 
-  /* ===== Layout: Sidebar + Content ===== */
+  /* ===== Layout ===== */
   .app-shell {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    grid-template-rows: 52px 1fr 26px;
+    grid-template-columns: 200px 1fr;
+    grid-template-rows: 48px 1fr 24px;
     height: 100vh;
     gap: 0;
   }
@@ -74,22 +83,26 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 16px;
     background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
     border-bottom: 3px solid #000;
     z-index: 10;
   }
   .topbar .logo {
     font-family: var(--font-pixel);
-    font-size: 16px;
+    font-size: 14px;
     color: var(--mc-green);
     text-shadow: 2px 2px 0 #000, 0 0 10px rgba(92,206,99,0.5);
     letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .topbar .logo .accent { color: var(--mc-gold); }
   .topbar .logo .dim { color: var(--mc-blue); }
+  .topbar .logo svg { width: 20px; height: 20px; flex-shrink: 0; }
   .topbar .status-area {
-    display: flex; gap: 14px; align-items: center;
+    display: flex; gap: 10px; align-items: center;
   }
   .conn-dot {
     width: 10px; height: 10px;
@@ -109,20 +122,21 @@
     flex-direction: column;
     padding: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    transition: transform 0.3s ease;
   }
   .sidebar .nav-group-title {
     font-family: var(--font-pixel);
     font-size: 6px;
     color: #555;
-    padding: 16px 16px 6px;
+    padding: 14px 14px 4px;
     letter-spacing: 1.5px;
-    text-transform: uppercase;
   }
   .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
+    gap: 10px;
+    padding: 11px 14px;
     font-size: 14px;
     color: var(--mc-gray-light);
     cursor: pointer;
@@ -130,6 +144,7 @@
     transition: background 0.1s, border-color 0.1s, color 0.1s;
     user-select: none;
     position: relative;
+    min-height: 44px; /* 触控友好 */
   }
   .nav-item:hover {
     background: #333;
@@ -142,53 +157,52 @@
     font-weight: 600;
   }
   .nav-item .nav-icon {
-    width: 22px; height: 22px;
+    width: 20px; height: 20px;
     image-rendering: pixelated;
     flex-shrink: 0;
-    opacity: 0.85;
   }
-  .nav-item.active .nav-icon { opacity: 1; }
+  .nav-item.active .nav-icon { filter: drop-shadow(0 0 2px var(--mc-green)); }
   .nav-item .nav-text {
     font-family: var(--font-ui);
     font-size: 14px;
   }
   .nav-item .badge {
     position: absolute;
-    right: 12px;
+    right: 10px;
     background: var(--mc-red);
     color: #fff;
     font-size: 10px;
-    padding: 1px 7px;
+    padding: 1px 6px;
     border: 1px solid #000;
     font-weight: bold;
     display: none;
   }
   .nav-item .badge.show { display: block; }
 
-  .sidebar .spacer { flex: 1; }
+  .sidebar .spacer { flex: 1; min-height: 10px; }
 
   /* Device card at bottom of sidebar */
   .sidebar .device-card {
-    margin: 8px 10px 12px;
+    margin: 6px 8px 10px;
     background: #1a1a1a;
     border: 2px solid #000;
-    padding: 12px;
+    padding: 10px;
   }
   .sidebar .device-card .label {
     font-family: var(--font-pixel);
     font-size: 6px;
     color: var(--mc-gray);
-    margin-bottom: 6px;
+    margin-bottom: 5px;
     letter-spacing: 1px;
   }
   .sidebar .device-card .name-display {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--mc-green);
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }
   .sidebar .device-card input {
     width: 100%;
@@ -196,17 +210,40 @@
     border: 1px solid var(--mc-green-dark);
     color: var(--mc-green);
     font-family: var(--font-pixel);
-    font-size: 8px;
-    padding: 6px;
+    font-size: 7px;
+    padding: 5px;
     outline: none;
   }
   .sidebar .device-card input:focus { border-color: var(--mc-green); }
 
+  /* ===== Mobile sidebar overlay ===== */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 19;
+  }
+  .sidebar-overlay.show { display: block; }
+
+  .menu-toggle {
+    display: none;
+    width: 36px; height: 36px;
+    background: #333;
+    border: 2px solid #000;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+  }
+  .menu-toggle svg { width: 18px; height: 18px; }
+
   /* ===== Main Content ===== */
   .main-content {
     overflow-y: auto;
-    padding: 20px 24px;
+    padding: 14px 16px;
     position: relative;
+    -webkit-overflow-scrolling: touch;
   }
   .page { display: none; }
   .page.active { display: block; }
@@ -216,37 +253,37 @@
     background: var(--mc-panel);
     border: 3px solid #000;
     box-shadow: var(--mc-shadow);
-    margin-bottom: 18px;
+    margin-bottom: 14px;
   }
   .mc-panel .panel-header {
     background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
     border-bottom: 2px solid #000;
-    padding: 10px 16px;
+    padding: 9px 14px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
   .mc-panel .panel-header .panel-icon {
-    width: 18px; height: 18px;
+    width: 16px; height: 16px;
     image-rendering: pixelated;
   }
   .mc-panel .panel-header .panel-title {
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: 9px;
     color: #fff;
     letter-spacing: 1px;
   }
-  .mc-panel .panel-body { padding: 18px; }
+  .mc-panel .panel-body { padding: 14px; }
 
   /* ===== Buttons ===== */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 11px 20px;
+    gap: 5px;
+    padding: 10px 18px;
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 8px;
     color: #fff;
     background: linear-gradient(180deg, #5a5a5a 0%, #4a4a5a 100%);
     border: 3px solid #000;
@@ -256,6 +293,8 @@
     letter-spacing: 1px;
     transition: filter 0.05s, transform 0.05s, box-shadow 0.05s;
     user-select: none;
+    min-height: 40px;
+    touch-action: manipulation;
   }
   .btn:hover { filter: brightness(1.15); }
   .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
@@ -264,32 +303,33 @@
   .btn-blue   { background: linear-gradient(180deg, var(--mc-blue) 0%, var(--mc-blue-dark) 100%); }
   .btn-red    { background: linear-gradient(180deg, var(--mc-red) 0%, var(--mc-red-dark) 100%); }
   .btn-gold   { background: linear-gradient(180deg, var(--mc-gold) 0%, #b0880f 100%); color: #000; }
-  .btn-small  { padding: 7px 14px; font-size: 7px; }
+  .btn-small  { padding: 6px 12px; font-size: 7px; min-height: 32px; }
 
   /* ===== Form ===== */
   .form-row {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 12px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px; flex-wrap: wrap;
   }
   .form-row label {
     font-size: 13px; color: var(--mc-gray-light);
-    min-width: 90px; font-weight: 500;
+    min-width: 80px; font-weight: 500;
   }
   .form-row input[type="text"],
   .form-row input[type="number"],
   .form-row input[type="password"],
   .form-row select {
-    flex: 1; min-width: 220px;
+    flex: 1; min-width: 160px;
     background: #000; border: 2px solid #333;
-    color: #fff; font-size: 14px; padding: 9px 12px;
+    color: #fff; font-size: 14px; padding: 8px 10px;
     font-family: var(--font-ui); outline: none;
+    min-height: 36px;
   }
   .form-row input:focus, .form-row select:focus { border-color: var(--mc-green); }
   .form-row textarea {
-    width: 100%; min-height: 90px;
+    width: 100%; min-height: 80px;
     background: #0a0a0a; border: 2px solid #333;
     color: var(--mc-green); font-family: var(--font-pixel);
-    font-size: 8px; padding: 12px; resize: vertical; outline: none; line-height: 1.6;
+    font-size: 7px; padding: 10px; resize: vertical; outline: none; line-height: 1.6;
   }
   .form-row textarea:focus { border-color: var(--mc-green); }
 
@@ -297,7 +337,7 @@
   .drop-zone {
     border: 3px dashed #444;
     background: #1a1a1a;
-    padding: 48px 24px;
+    padding: 36px 16px;
     text-align: center;
     cursor: pointer;
     transition: border-color 0.2s, background 0.2s;
@@ -309,48 +349,46 @@
   }
   .drop-zone .dz-icon {
     font-family: var(--font-pixel);
-    font-size: 32px;
+    font-size: 28px;
     color: #444;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     line-height: 1;
   }
   .drop-zone.dragover .dz-icon { color: var(--mc-green); }
-  .drop-zone .dz-text { font-size: 15px; color: var(--mc-gray); }
+  .drop-zone .dz-text { font-size: 14px; color: var(--mc-gray); }
   .drop-zone .dz-hint {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 6px;
     color: #555;
-    margin-top: 10px;
+    margin-top: 8px;
   }
 
   /* ===== File List ===== */
-  .file-list { margin-top: 14px; max-height: 320px; overflow-y: auto; }
+  .file-list { margin-top: 12px; max-height: 300px; overflow-y: auto; }
   .file-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
     background: #1e1e1e;
     border: 2px solid #333;
-    margin-bottom: 6px;
-    transition: border-color 0.15s;
+    margin-bottom: 5px;
   }
-  .file-item:hover { border-color: #555; }
   .file-item .fi-icon {
-    width: 34px; height: 34px;
+    width: 30px; height: 30px;
     image-rendering: pixelated; flex-shrink: 0;
     border: 2px solid #000;
   }
   .file-item .fi-info { flex: 1; min-width: 0; }
   .file-item .fi-name {
-    font-size: 14px; color: #fff;
+    font-size: 13px; color: #fff;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .file-item .fi-size {
-    font-family: var(--font-pixel); font-size: 7px;
-    color: var(--mc-gray); margin-top: 3px;
+    font-family: var(--font-pixel); font-size: 6px;
+    color: var(--mc-gray); margin-top: 2px;
   }
   .file-item .fi-status {
-    font-family: var(--font-pixel); font-size: 7px;
-    padding: 3px 8px; border: 1px solid #000; flex-shrink: 0;
+    font-family: var(--font-pixel); font-size: 6px;
+    padding: 3px 7px; border: 1px solid #000; flex-shrink: 0;
   }
   .fi-status.queued     { background: #444; color: #ccc; }
   .fi-status.sending    { background: var(--mc-green-dark); color: #fff; }
@@ -359,9 +397,9 @@
   .fi-status.receiving  { background: var(--mc-blue-dark); color: #fff; }
 
   /* ===== Progress Bar ===== */
-  .progress-wrap { margin-top: 8px; }
+  .progress-wrap { margin-top: 6px; }
   .progress-bar {
-    height: 24px; background: #0a0a0a;
+    height: 22px; background: #0a0a0a;
     border: 2px solid #000; position: relative; overflow: hidden;
   }
   .progress-fill {
@@ -376,20 +414,21 @@
   .progress-text {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-pixel); font-size: 9px;
+    font-family: var(--font-pixel); font-size: 8px;
     color: #fff; text-shadow: 1px 1px 0 #000; z-index: 1;
   }
   .progress-info {
     display: flex; justify-content: space-between;
-    margin-top: 5px;
-    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray);
+    margin-top: 4px;
+    font-family: var(--font-pixel); font-size: 6px; color: var(--mc-gray);
+    flex-wrap: wrap; gap: 4px;
   }
 
   /* ===== Log Console ===== */
   .log-console {
     background: #0a0a0a; border: 2px solid #000;
-    height: 200px; overflow-y: auto; padding: 12px;
-    font-family: var(--font-pixel); font-size: 7px; line-height: 2.2;
+    height: 160px; overflow-y: auto; padding: 10px;
+    font-family: var(--font-pixel); font-size: 6px; line-height: 2.2;
   }
   .log-line { white-space: pre-wrap; word-break: break-all; }
   .log-info  { color: var(--mc-gray-light); }
@@ -399,15 +438,16 @@
   .log-data  { color: var(--mc-blue); }
 
   /* ===== Transfer Table ===== */
-  .xf-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .xf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .xf-table th {
     background: #333; color: var(--mc-gray-light);
-    font-family: var(--font-pixel); font-size: 7px;
-    padding: 10px 12px; text-align: left; border-bottom: 2px solid #000;
+    font-family: var(--font-pixel); font-size: 6px;
+    padding: 8px 10px; text-align: left; border-bottom: 2px solid #000;
+    white-space: nowrap;
   }
-  .xf-table td { padding: 10px 12px; border-bottom: 1px solid #333; color: #ccc; }
+  .xf-table td { padding: 8px 10px; border-bottom: 1px solid #333; color: #ccc; }
   .xf-table tr:hover td { background: #2a2a2a; }
-  .tag { font-family: var(--font-pixel); font-size: 7px; padding: 3px 8px; border: 1px solid #000; }
+  .tag { font-family: var(--font-pixel); font-size: 6px; padding: 3px 7px; border: 1px solid #000; }
   .tag-send  { background: var(--mc-green-dark); color: #fff; }
   .tag-recv  { background: var(--mc-blue-dark); color: #fff; }
   .tag-done  { background: var(--mc-green-dk2); color: #fff; }
@@ -416,45 +456,45 @@
   /* ===== Info Grid ===== */
   .info-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
   }
   .info-card {
-    background: #1e1e1e; border: 2px solid #333; padding: 14px;
+    background: #1e1e1e; border: 2px solid #333; padding: 12px;
   }
   .info-card .ic-label {
-    font-family: var(--font-pixel); font-size: 7px;
-    color: var(--mc-gray); margin-bottom: 6px;
+    font-family: var(--font-pixel); font-size: 6px;
+    color: var(--mc-gray); margin-bottom: 5px;
   }
   .info-card .ic-value {
-    font-size: 16px; color: #fff; font-weight: 600;
+    font-size: 15px; color: #fff; font-weight: 600;
   }
   .info-card .ic-value.green  { color: var(--mc-green); }
   .info-card .ic-value.red    { color: var(--mc-red); }
   .info-card .ic-value.yellow { color: var(--mc-yellow); }
 
   /* ===== Toolbar ===== */
-  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 
   /* ===== Peer List ===== */
-  .peer-list { display: flex; flex-direction: column; gap: 10px; }
+  .peer-list { display: flex; flex-direction: column; gap: 8px; }
   .peer-item {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px; background: #1e1e1e; border: 2px solid #333;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; background: #1e1e1e; border: 2px solid #333;
     transition: border-color 0.15s;
   }
   .peer-item:hover { border-color: var(--mc-green); }
   .peer-item .peer-avatar {
-    width: 40px; height: 40px;
+    width: 36px; height: 36px;
     background: var(--mc-green-dark); border: 2px solid #000;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-pixel); font-size: 14px; color: #fff; flex-shrink: 0;
+    font-family: var(--font-pixel); font-size: 12px; color: #fff; flex-shrink: 0;
   }
-  .peer-item .peer-info { flex: 1; }
-  .peer-item .peer-name { font-size: 15px; color: #fff; font-weight: 600; }
+  .peer-item .peer-info { flex: 1; min-width: 0; }
+  .peer-item .peer-name { font-size: 14px; color: #fff; font-weight: 600; }
   .peer-item .peer-meta {
-    font-family: var(--font-pixel); font-size: 7px;
-    color: var(--mc-gray); margin-top: 3px;
+    font-family: var(--font-pixel); font-size: 6px;
+    color: var(--mc-gray); margin-top: 2px;
   }
 
   /* ===== Modal ===== */
@@ -462,33 +502,34 @@
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.75); z-index: 100;
     align-items: center; justify-content: center;
+    padding: 16px;
   }
   .modal-overlay.show { display: flex; }
   .modal-box {
     background: var(--mc-panel); border: 3px solid #000;
-    box-shadow: 6px 6px 0 #000; min-width: 420px; max-width: 600px; max-height: 80vh; overflow-y: auto;
+    box-shadow: 6px 6px 0 #000; min-width: 300px; max-width: 100%; max-height: 85vh; overflow-y: auto;
   }
   .modal-box .panel-header {
     background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
-    border-bottom: 2px solid #000; padding: 12px 16px;
+    border-bottom: 2px solid #000; padding: 10px 14px;
     display: flex; align-items: center; justify-content: space-between;
   }
   .modal-box .panel-header .panel-title {
-    font-family: var(--font-pixel); font-size: 11px; color: #fff;
+    font-family: var(--font-pixel); font-size: 10px; color: #fff;
   }
-  .modal-box .panel-body { padding: 18px; }
+  .modal-box .panel-body { padding: 16px; }
 
   /* ===== Status Bar ===== */
   .statusbar {
     grid-column: 1 / -1;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 14px;
+    padding: 0 10px;
     background: #111; border-top: 2px solid #000;
-    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray);
+    font-family: var(--font-pixel); font-size: 6px; color: var(--mc-gray);
     z-index: 10;
   }
-  .statusbar .sb-left, .statusbar .sb-right { display: flex; gap: 18px; align-items: center; }
-  .statusbar .sb-item { display: flex; align-items: center; gap: 5px; }
+  .statusbar .sb-left, .statusbar .sb-right { display: flex; gap: 12px; align-items: center; }
+  .statusbar .sb-item { display: flex; align-items: center; gap: 4px; }
 
   /* ===== Utility ===== */
   .hidden { display: none !important; }
@@ -502,37 +543,26 @@
   .mt16 { margin-top: 16px; }
   .mb8  { margin-bottom: 8px; }
   .mb12 { margin-bottom: 12px; }
-  .flex-gap { display: flex; gap: 10px; flex-wrap: wrap; }
+  .flex-gap { display: flex; gap: 8px; flex-wrap: wrap; }
   .text-center { text-align: center; }
-  .small-pixel { font-family: var(--font-pixel); font-size: 7px; }
+  .small-pixel { font-family: var(--font-pixel); font-size: 6px; }
 
   /* ===== Scrollbar ===== */
-  ::-webkit-scrollbar { width: 12px; }
+  ::-webkit-scrollbar { width: 10px; }
   ::-webkit-scrollbar-track { background: #1a1a1a; border-left: 2px solid #000; }
   ::-webkit-scrollbar-thumb { background: #444; border: 2px solid #000; }
   ::-webkit-scrollbar-thumb:hover { background: #555; }
-
-  /* ===== Responsive ===== */
-  @media (max-width: 768px) {
-    .app-shell { grid-template-columns: 60px 1fr; }
-    .sidebar .nav-text, .sidebar .nav-group-title,
-    .sidebar .device-card .label, .sidebar .device-card .name-display,
-    .sidebar .device-card input { display: none; }
-    .sidebar .device-card { margin: 4px; padding: 6px; }
-    .nav-item { padding: 12px; justify-content: center; }
-    .topbar .logo { font-size: 11px; }
-  }
 
   /* ===== Connection Method Cards ===== */
   .method-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 12px;
   }
   .method-card {
     background: #1e1e1e;
     border: 3px solid #333;
-    padding: 20px;
+    padding: 16px;
     cursor: pointer;
     transition: border-color 0.15s, transform 0.05s;
     position: relative;
@@ -540,92 +570,204 @@
   .method-card:hover { border-color: var(--mc-green); }
   .method-card.selected { border-color: var(--mc-green); background: #1a2a1a; }
   .method-card .mc-label {
-    font-family: var(--font-pixel); font-size: 8px;
-    color: var(--mc-green); margin-bottom: 8px; letter-spacing: 1px;
+    font-family: var(--font-pixel); font-size: 7px;
+    color: var(--mc-green); margin-bottom: 6px; letter-spacing: 1px;
   }
   .method-card .mc-title {
-    font-size: 16px; color: #fff; font-weight: 600; margin-bottom: 6px;
+    font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 5px;
   }
   .method-card .mc-desc {
-    font-size: 13px; color: var(--mc-gray); line-height: 1.6;
+    font-size: 12px; color: var(--mc-gray); line-height: 1.5;
   }
   .method-card .mc-radio {
-    position: absolute; top: 14px; right: 14px;
-    width: 16px; height: 16px; border: 2px solid #555; background: #000;
+    position: absolute; top: 12px; right: 12px;
+    width: 14px; height: 14px; border: 2px solid #555; background: #000;
   }
   .method-card.selected .mc-radio { border-color: var(--mc-green); background: var(--mc-green); }
 
-  /* ===== Auto-discovery status ===== */
-  .discovery-panel {
-    background: #1a2a1a; border: 2px solid var(--mc-green-dark);
-    padding: 14px 18px; margin-bottom: 16px;
-    display: flex; align-items: center; gap: 14px;
+  /* ===== Connection Guide ===== */
+  .guide-box {
+    background: #1a1a2e;
+    border: 2px solid var(--mc-blue-dark);
+    padding: 14px 16px;
+    margin-bottom: 14px;
   }
-  .discovery-panel .dp-icon {
+  .guide-box .guide-title {
+    font-family: var(--font-pixel); font-size: 8px;
+    color: var(--mc-blue); margin-bottom: 8px;
+  }
+  .guide-box .guide-step {
+    font-size: 13px; color: #ccc; line-height: 2;
+  }
+  .guide-box .guide-step strong { color: var(--mc-green); }
+  .guide-box .guide-step .hl { color: var(--mc-yellow); }
+
+  .warn-box {
+    background: #2e1a1a;
+    border: 2px solid var(--mc-red-dark);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .warn-box .warn-title {
+    font-family: var(--font-pixel); font-size: 7px;
+    color: var(--mc-red); margin-bottom: 6px;
+  }
+  .warn-box .warn-text {
+    font-size: 12px; color: #ccc; line-height: 1.7;
+  }
+
+  /* ===== Quick Connect Banner ===== */
+  .connect-banner {
+    background: linear-gradient(90deg, #1a3a1a 0%, #1a2a2a 100%);
+    border: 2px solid var(--mc-green-dark);
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .connect-banner .cb-icon {
     width: 12px; height: 12px; border: 2px solid #000;
-    background: var(--mc-green); box-shadow: 0 0 8px var(--mc-green);
+    background: var(--mc-red); box-shadow: 0 0 8px var(--mc-red);
     flex-shrink: 0;
+    animation: pulse-red 1s infinite;
   }
-  .discovery-panel.disconnected .dp-icon {
-    background: var(--mc-yellow); box-shadow: 0 0 6px var(--mc-yellow);
-  }
-  .discovery-panel.connected {
-    background: #1a3a1a; border-color: var(--mc-green);
-  }
-  .discovery-panel.connected .dp-icon {
+  .connect-banner.connected .cb-icon {
     background: var(--mc-green); box-shadow: 0 0 12px var(--mc-green);
-    animation: pulse 1.5s infinite;
+    animation: pulse-green 2s infinite;
   }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-  .discovery-panel .dp-text {
-    font-size: 14px; color: #ccc; flex: 1;
+  @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .connect-banner .cb-text {
+    font-size: 14px; color: #ccc; flex: 1; min-width: 200px;
   }
-  .discovery-panel .dp-text strong { color: var(--mc-green); }
-  .discovery-panel .dp-hint {
-    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray);
-  }
+  .connect-banner .cb-text strong { color: var(--mc-yellow); }
+  .connect-banner.connected .cb-text strong { color: var(--mc-green); }
 
   /* ===== Broadcast peer list ===== */
   .broadcast-peer {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px; background: #1e1e1e; border: 2px solid #333;
-    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; background: #1e1e1e; border: 2px solid #333;
+    margin-bottom: 6px;
   }
   .broadcast-peer .bp-avatar {
-    width: 40px; height: 40px;
+    width: 36px; height: 36px;
     background: linear-gradient(135deg, var(--mc-blue), var(--mc-green-dark));
     border: 2px solid #000;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-pixel); font-size: 14px; color: #fff; flex-shrink: 0;
+    font-family: var(--font-pixel); font-size: 12px; color: #fff; flex-shrink: 0;
   }
-  .broadcast-peer .bp-info { flex: 1; }
-  .broadcast-peer .bp-name { font-size: 15px; color: #fff; font-weight: 600; }
+  .broadcast-peer .bp-info { flex: 1; min-width: 0; }
+  .broadcast-peer .bp-name { font-size: 14px; color: #fff; font-weight: 600; }
   .broadcast-peer .bp-meta {
-    font-family: var(--font-pixel); font-size: 7px; color: var(--mc-gray); margin-top: 3px;
+    font-family: var(--font-pixel); font-size: 6px; color: var(--mc-gray); margin-top: 2px;
   }
   .broadcast-peer .bp-badge {
-    font-family: var(--font-pixel); font-size: 7px;
-    padding: 3px 8px; border: 1px solid #000;
+    font-family: var(--font-pixel); font-size: 6px;
+    padding: 3px 7px; border: 1px solid #000;
     background: var(--mc-green-dark); color: #fff;
   }
+
+  /* ===== Responsive: Mobile ===== */
+  @media (max-width: 768px) {
+    .app-shell {
+      grid-template-columns: 1fr;
+      grid-template-rows: 48px 1fr 24px;
+    }
+    .sidebar {
+      position: fixed;
+      top: 48px;
+      left: 0;
+      bottom: 0;
+      width: 200px;
+      z-index: 20;
+      transform: translateX(-100%);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    .menu-toggle { display: flex; }
+    .topbar .logo { font-size: 11px; }
+    .topbar .logo svg { width: 16px; height: 16px; }
+    .method-grid { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: repeat(2, 1fr); }
+    .main-content { padding: 10px 12px; }
+    .mc-panel .panel-body { padding: 12px; }
+    .connect-banner { padding: 12px 14px; }
+    .guide-box { padding: 12px 14px; }
+    .btn { padding: 9px 14px; font-size: 7px; }
+    .form-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .form-row label { min-width: unset; }
+    .form-row input, .form-row select { width: 100%; min-width: unset; }
+  }
+
+  @media (max-width: 480px) {
+    .info-grid { grid-template-columns: 1fr; }
+    .topbar { padding: 0 10px; }
+    .statusbar { font-size: 5px; padding: 0 6px; }
+    .statusbar .sb-left, .statusbar .sb-right { gap: 8px; }
+  }
+
+  /* ===== Toast Notification ===== */
+  .toast-container {
+    position: fixed;
+    top: 56px;
+    right: 16px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    background: #2a2a2a;
+    border: 2px solid #000;
+    box-shadow: 3px 3px 0 #000;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #fff;
+    animation: toast-in 0.3s ease, toast-out 0.3s ease 2.7s forwards;
+    max-width: 320px;
+    pointer-events: auto;
+  }
+  .toast.success { border-left: 4px solid var(--mc-green); }
+  .toast.error   { border-left: 4px solid var(--mc-red); }
+  .toast.info    { border-left: 4px solid var(--mc-blue); }
+  .toast.warn    { border-left: 4px solid var(--mc-yellow); }
+  @keyframes toast-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateX(20px); } }
 </style>
 </head>
 <body>
+
+<div class="toast-container" id="toastContainer"></div>
 
 <div class="app-shell">
 
   <!-- ========== TOP BAR ========== -->
   <div class="topbar">
-    <div class="logo">G<span class="accent">H</span>C <span class="dim">//</span> 局域网文件互传</div>
+    <div style="display:flex;align-items:center;">
+      <div class="menu-toggle" id="menuToggle">
+        <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="2" fill="#fff"/><rect x="2" y="7" width="12" height="2" fill="#fff"/><rect x="2" y="11" width="12" height="2" fill="#fff"/></svg>
+      </div>
+      <div class="logo">
+        <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" fill="#5cce63"/><rect x="9" y="1" width="6" height="6" fill="#5b9bd5"/><rect x="1" y="9" width="6" height="6" fill="#e0c040"/><rect x="9" y="9" width="6" height="6" fill="#d04040"/></svg>
+        G<span class="accent">H</span>C <span class="dim">传</span>
+      </div>
+    </div>
     <div class="status-area">
       <span class="small-pixel text-gray" id="topbarRoom">房间: --</span>
       <span class="conn-dot offline" id="connDot"></span>
-      <span class="small-pixel" id="connText" style="color:var(--mc-gray)">未连接</span>
+      <span class="small-pixel" id="connText" style="color:var(--mc-red)">未连接</span>
     </div>
   </div>
 
+  <!-- ========== Sidebar Overlay (mobile) ========== -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <!-- ========== SIDEBAR ========== -->
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="nav-group-title">-- 主菜单 --</div>
 
     <div class="nav-item active" data-page="page-dashboard">
@@ -678,6 +820,14 @@
 
     <!-- ===== PAGE: Dashboard ===== -->
     <div class="page active" id="page-dashboard">
+      <div class="connect-banner" id="connectBanner">
+        <div class="cb-icon" id="cbIcon"></div>
+        <div class="cb-text" id="cbText">
+          <strong>当前未连接</strong> — 请进入「建立连接」页面选择连接方式
+        </div>
+        <button class="btn btn-green btn-small" id="btnGoConnect">去连接</button>
+      </div>
+
       <div class="mc-panel">
         <div class="panel-header">
           <svg class="panel-icon" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" fill="#5cce63"/><rect x="9" y="1" width="6" height="6" fill="#5b9bd5"/><rect x="1" y="9" width="6" height="6" fill="#e0c040"/><rect x="9" y="9" width="6" height="6" fill="#d04040"/></svg>
@@ -687,7 +837,7 @@
           <div class="info-grid" id="infoGrid">
             <div class="info-card">
               <div class="ic-label">连接状态</div>
-              <div class="ic-value red" id="infoConn">离线</div>
+              <div class="ic-value red" id="infoConn">未连接</div>
             </div>
             <div class="info-card">
               <div class="ic-label">对端设备</div>
@@ -711,14 +861,14 @@
             </div>
           </div>
 
-          <div class="mt16 toolbar">
+          <div class="mt12 toolbar">
             <button class="btn btn-green" id="btnQuickConnect">[ 快速连接 ]</button>
             <button class="btn btn-red" id="btnDisconnect">[ 断开连接 ]</button>
             <button class="btn" id="btnOpenSend">[ 去发送文件 ]</button>
           </div>
 
           <div class="mt12">
-            <div style="font-family:var(--font-pixel);font-size:8px;color:var(--mc-gray);margin-bottom:8px;">实时日志</div>
+            <div style="font-family:var(--font-pixel);font-size:7px;color:var(--mc-gray);margin-bottom:6px;">实时日志</div>
             <div class="log-console" id="logConsole"></div>
           </div>
         </div>
@@ -727,38 +877,34 @@
 
     <!-- ===== PAGE: Connect ===== -->
     <div class="page" id="page-connect">
-      <!-- Auto-discovery notice -->
-      <div class="discovery-panel" id="discoveryPanel">
-        <div class="dp-icon" id="dpIcon"></div>
-        <div class="dp-text" id="discoveryText">
-          正在广播发现信号... 房间: <strong id="discoveryRoom">GHC-001</strong>
+      <!-- Warning for HTTPS / GitHub Pages -->
+      <div class="warn-box hidden" id="httpsWarn">
+        <div class="warn-title">注意: HTTPS 环境限制</div>
+        <div class="warn-text">
+          当前页面通过 HTTPS 加载，部分浏览器可能限制 WebSocket 连接。<br/>
+          如果自动发现不可用，请使用下方的「手动密钥交换」方式连接。
         </div>
-        <div class="dp-hint" id="discoveryHint">同一浏览器多标签页自动发现</div>
       </div>
 
-      <!-- Quick Help -->
-      <div class="mc-panel" id="quickHelpPanel">
-        <div class="panel-header">
-          <span class="panel-title">连接帮助 / HOW TO CONNECT</span>
+      <!-- Guide -->
+      <div class="guide-box">
+        <div class="guide-title">如何建立连接?</div>
+        <div class="guide-step">
+          <strong>方式一: 同浏览器多标签页 (自动)</strong><br/>
+          两台设备都打开同一个 GHC 页面 → 等待下方列表出现对方 → 点击「连接」<br/><br/>
+          <strong>方式二: 跨设备手动密钥 (通用)</strong><br/>
+          1. 发起方点「生成邀请密钥」→ 复制 → 通过微信/QQ发给对方<br/>
+          2. 接收方粘贴密钥 → 点「生成应答密钥」→ 复制发回<br/>
+          3. 发起方粘贴应答密钥 → 连接建立
         </div>
-        <div class="panel-body" style="font-size:13px;line-height:2;color:#ccc;">
-          <p><strong style="color:var(--mc-green)">情况一：两台设备都用本页面（同一WiFi）</strong></p>
-          <p style="color:#999;margin-left:16px;">
-            1. 双方都打开本页面（确保URL相同）<br/>
-            2. 各自在下方"局域网设备"列表看到对方<br/>
-            3. 点击对方旁边的 <span style="color:var(--mc-green)">[连接]</span> 按钮<br/>
-            4. 等待状态变为绿色"已连接"
-          </p>
-          <p style="margin-top:8px;"><strong style="color:var(--mc-yellow)">情况二：BroadcastChannel 不可用时</strong></p>
-          <p style="color:#999;margin-left:16px;">
-            1. 下方选择 <span style="color:var(--mc-yellow)">[方法二: 手动密钥交换]</span><br/>
-            2. 发起方点"生成邀请密钥"→ 复制密钥 → 通过微信/QQ发送<br/>
-            3. 接收方粘贴密钥 → 点"确认并连接"<br/>
-            4. 发起方收到应答密钥后粘贴 → 完成连接
-          </p>
-          <p style="margin-top:8px;color:var(--mc-gray);font-size:12px;">
-            提示: 页面显示"未连接"是正常初始状态，必须完成上述步骤才会变绿。
-          </p>
+      </div>
+
+      <!-- Quick status -->
+      <div class="connect-banner" id="connectBanner2">
+        <div class="cb-icon" id="cbIcon2"></div>
+        <div class="cb-text" id="cbText2">
+          状态: <strong id="connStatusText">未连接</strong>
+          <span id="connPeerText"></span>
         </div>
       </div>
 
@@ -766,15 +912,15 @@
       <div class="method-grid mb12">
         <div class="method-card selected" id="methodBroadcast">
           <div class="mc-radio"></div>
-          <div class="mc-label">方法一</div>
-          <div class="mc-title">局域网自动发现</div>
-          <div class="mc-desc">同一台电脑的多标签页自动发现并连接。跨设备需配合手动密钥交换使用。</div>
+          <div class="mc-label">方式一</div>
+          <div class="mc-title">自动发现 (同浏览器)</div>
+          <div class="mc-desc">同一台电脑的多标签页自动发现并连接。无需任何服务器。</div>
         </div>
         <div class="method-card" id="methodManual">
           <div class="mc-radio"></div>
-          <div class="mc-label">方法二</div>
+          <div class="mc-label">方式二</div>
           <div class="mc-title">手动密钥交换</div>
-          <div class="mc-desc">生成连接密钥，通过微信/QQ 等任意方式发送给对方，粘贴即可建立连接。</div>
+          <div class="mc-desc">生成连接密钥，通过微信/QQ等任意方式发送给对方，粘贴即可连接。支持跨设备。</div>
         </div>
       </div>
 
@@ -782,16 +928,25 @@
       <div class="mc-panel" id="broadcastPanel">
         <div class="panel-header">
           <svg class="panel-icon" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="#5cce63"/><rect x="5" y="5" width="6" height="6" fill="#3a8c3f"/><rect x="7" y="1" width="2" height="2" fill="#e0c040"/></svg>
-          <span class="panel-title">局域网设备 / LOCAL DEVICES</span>
+          <span class="panel-title">局域网设备 / DEVICES</span>
         </div>
         <div class="panel-body">
           <div class="form-row">
             <label>房间号</label>
-            <input type="text" id="roomInput" value="GHC-001" placeholder="房间名" style="max-width:200px" />
-            <button class="btn btn-small" id="btnChangeRoom">切换房间</button>
-            <span class="small-pixel text-gray">同一房间内的设备自动可见</span>
+            <input type="text" id="roomInput" value="GHC-001" placeholder="房间名" style="max-width:180px" />
+            <button class="btn btn-small" id="btnChangeRoom">切换</button>
+            <span class="small-pixel text-gray">同房间设备自动可见</span>
           </div>
           <div class="peer-list mt8" id="peerList"></div>
+          <div id="bcUnsupported" class="hidden">
+            <div class="warn-box">
+              <div class="warn-title">自动发现不可用</div>
+              <div class="warn-text">
+                当前浏览器不支持 BroadcastChannel，或页面运行在受限环境中。<br/>
+                请使用上方的「手动密钥交换」方式建立连接。
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -799,7 +954,7 @@
       <div class="mc-panel mt16 hidden" id="manualPanel">
         <div class="panel-header">
           <svg class="panel-icon" viewBox="0 0 16 16"><rect x="2" y="6" width="12" height="4" fill="#5b9bd5"/><rect x="6" y="2" width="4" height="12" fill="#5b9bd5"/></svg>
-          <span class="panel-title">手动连接 / MANUAL SDP</span>
+          <span class="panel-title">手动连接 / MANUAL KEY</span>
         </div>
         <div class="panel-body">
           <div class="form-row">
@@ -821,6 +976,7 @@
             </div>
             <div class="form-row">
               <button class="btn btn-small" id="btnCopyOffer">复制密钥</button>
+              <button class="btn btn-small btn-blue" id="btnShareOffer">分享密钥</button>
             </div>
           </div>
 
@@ -834,6 +990,7 @@
             </div>
             <div class="form-row">
               <button class="btn btn-blue btn-small" id="btnApplyAnswer">确认并连接</button>
+              <button class="btn btn-small" id="btnCopyAnswer">复制应答</button>
             </div>
           </div>
         </div>
@@ -850,8 +1007,8 @@
         <div class="panel-body">
           <div class="drop-zone" id="dropZone">
             <div class="dz-icon">[ + ]</div>
-            <div class="dz-text">拖拽文件到此处，或点击选择文件</div>
-            <div class="dz-hint">支持多文件 / 大文件分块传输 / 最大 10GB</div>
+            <div class="dz-text">点击选择文件，或拖拽到此处</div>
+            <div class="dz-hint">支持多文件 / 分块传输 / 最大 10GB</div>
             <input type="file" id="fileInput" multiple style="display:none" />
           </div>
 
@@ -863,7 +1020,7 @@
           </div>
 
           <div id="activeSend" class="mt12 hidden">
-            <div style="font-family:var(--font-pixel);font-size:9px;color:var(--mc-green);margin-bottom:6px;" id="activeSendName">--</div>
+            <div style="font-family:var(--font-pixel);font-size:8px;color:var(--mc-green);margin-bottom:4px;" id="activeSendName">--</div>
             <div class="progress-wrap">
               <div class="progress-bar">
                 <div class="progress-fill" id="activeSendBar"></div>
@@ -889,13 +1046,13 @@
         </div>
         <div class="panel-body">
           <div id="recvEmpty" class="text-center mt12 mb12">
-            <div style="font-family:var(--font-pixel);font-size:12px;color:#444;margin-bottom:10px;">[ 等待接收 ]</div>
+            <div style="font-family:var(--font-pixel);font-size:10px;color:#444;margin-bottom:8px;">[ 等待接收 ]</div>
             <div class="text-gray">连接建立后，文件将自动出现在这里</div>
           </div>
           <div class="file-list" id="recvFileList"></div>
 
           <div id="activeRecv" class="mt12 hidden">
-            <div style="font-family:var(--font-pixel);font-size:9px;color:var(--mc-blue);margin-bottom:6px;" id="activeRecvName">--</div>
+            <div style="font-family:var(--font-pixel);font-size:8px;color:var(--mc-blue);margin-bottom:4px;" id="activeRecvName">--</div>
             <div class="progress-wrap">
               <div class="progress-bar">
                 <div class="progress-fill blue" id="activeRecvBar"></div>
@@ -967,7 +1124,6 @@
               <option value="4194304" selected>4 MB (推荐)</option>
               <option value="8388608">8 MB</option>
             </select>
-            <span class="small-pixel text-gray">缓冲区超过此值暂停发送</span>
           </div>
           <div class="form-row">
             <label>信令服务器</label>
@@ -1002,12 +1158,13 @@
           <span class="panel-title">关于 / ABOUT</span>
         </div>
         <div class="panel-body">
-          <div style="font-size:14px;color:#ccc;line-height:1.8;">
-            <strong style="color:var(--mc-green)">GHC</strong> - 局域网文件互传工具<br/>
-            版本: v3.0.0<br/>
+          <div style="font-size:13px;color:#ccc;line-height:1.8;">
+            <strong style="color:var(--mc-green)">GHC 传</strong> - 局域网文件互传工具<br/>
+            版本: v4.0.0<br/>
             协议: WebRTC DataChannel (P2P)<br/>
-            特性: 零依赖单文件 / 分块传输 / 大文件支持 / 局域网自动发现 / MC 像素风格<br/>
-            浏览器: Chrome 56+ / Firefox 44+ / Edge 79+ / Safari 11+
+            特性: 单文件零依赖 / 分块传输 / 大文件支持 / 手动密钥交换 / MC像素风格<br/>
+            浏览器: Chrome 56+ / Firefox 44+ / Edge 79+ / Safari 11+<br/>
+            作者: georain
           </div>
         </div>
       </div>
@@ -1018,7 +1175,7 @@
   <!-- ========== STATUS BAR ========== -->
   <div class="statusbar">
     <div class="sb-left">
-      <span class="sb-item"><span class="conn-dot online" id="sbConnDot" style="width:6px;height:6px;display:none"></span><span id="sbConnText">就绪</span></span>
+      <span class="sb-item"><span class="conn-dot online" id="sbConnDot" style="width:5px;height:5px;display:none"></span><span id="sbConnText">就绪</span></span>
       <span class="sb-item" id="sbPeer">对端: --</span>
     </div>
     <div class="sb-right">
@@ -1066,21 +1223,22 @@
 'use strict';
 
 /* ========================================================================
-   GHC - LAN File Transfer (Minecraft Pixel Style) v3.0.0
-   Features: BroadcastChannel auto-discovery + Manual SDP + WebSocket signal
+   GHC 传 - LAN File Transfer (Minecraft Pixel Style) v4.0.0
+   Features: BroadcastChannel auto-discovery + Manual SDP key exchange
+   Mobile-friendly, Chinese UI, large file support
    ======================================================================== */
 
 // ===== Constants =====
 const CHUNK_SIZE_DEFAULT = 16384;
 const BACKPRESSURE_DEFAULT = 4194304;
-const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
 const SIGNAL_PROTOCOL = 'ghc/1.0';
 const BROADCAST_CHANNEL_PREFIX = 'ghc-room-';
-const BROADCAST_HEARTBEAT = 3000; // ms
+const BROADCAST_HEARTBEAT = 3000;
 
 // ===== State =====
 const state = {
-  deviceName: 'PC-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
+  deviceName: '设备-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
   room: 'GHC-001',
   chunkSize: CHUNK_SIZE_DEFAULT,
   backpressure: BACKPRESSURE_DEFAULT,
@@ -1089,7 +1247,7 @@ const state = {
   dataChannel: null,
   signalWs: null,
   signalUrl: '',
-  peers: [],           // broadcast-discovered peers
+  peers: [],
   pendingPair: null,
   pendingFiles: [],
   sending: false,
@@ -1105,11 +1263,12 @@ const state = {
   connected: false,
   peerName: '',
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-  // BroadcastChannel
   bc: null,
   bcId: Math.random().toString(36).substr(2, 10),
-  bcPeers: new Map(), // id -> {name, lastSeen}
-  connectMethod: 'broadcast', // 'broadcast' | 'manual'
+  bcPeers: new Map(),
+  connectMethod: 'broadcast',
+  isMobile: /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent),
+  bcSupported: typeof BroadcastChannel !== 'undefined',
 };
 
 // ===== DOM Helpers =====
@@ -1132,9 +1291,18 @@ function el(tag, attrs = {}, children = []) {
   return e;
 }
 
+// ===== Toast Notifications =====
+function showToast(msg, type = 'info') {
+  const container = $('toastContainer');
+  const toast = el('div', { class: `toast ${type}`, text: msg });
+  container.appendChild(toast);
+  setTimeout(() => { try { container.removeChild(toast); } catch(e) {} }, 3000);
+}
+
 // ===== Logging =====
 function log(msg, level = 'info') {
   const console = $('logConsole');
+  if (!console) return;
   const line = el('div', { class: `log-line log-${level}`, text: `[${nowStr()}] ${msg}` });
   console.appendChild(line);
   console.scrollTop = console.scrollHeight;
@@ -1223,7 +1391,20 @@ $$('.nav-item[data-page]').forEach(item => {
     item.classList.add('active');
     $$('.page').forEach(p => p.classList.remove('active'));
     $(page).classList.add('active');
+    // Close mobile sidebar
+    $('sidebar').classList.remove('open');
+    $('sidebarOverlay').classList.remove('show');
   });
+});
+
+// Mobile menu toggle
+$('menuToggle').addEventListener('click', () => {
+  $('sidebar').classList.toggle('open');
+  $('sidebarOverlay').classList.toggle('show');
+});
+$('sidebarOverlay').addEventListener('click', () => {
+  $('sidebar').classList.remove('open');
+  $('sidebarOverlay').classList.remove('show');
 });
 
 // ===== Device Name =====
@@ -1251,22 +1432,56 @@ function setConnStatus(status, text) {
   $('infoConn').className = 'ic-value ' + (status === 'online' ? 'green' : status === 'connecting' ? 'yellow' : 'red');
 
   const sbDot = $('sbConnDot');
-  if (status === 'online') { sbDot.style.display = ''; sbDot.className = 'conn-dot online'; $('sbConnText').textContent = '已连接'; $('sbConnText').style.color = 'var(--mc-green)'; }
-  else if (status === 'connecting') { sbDot.style.display = ''; sbDot.className = 'conn-dot connecting'; $('sbConnText').textContent = '连接中...'; $('sbConnText').style.color = 'var(--mc-yellow)'; }
-  else { sbDot.style.display = 'none'; $('sbConnText').textContent = '离线'; $('sbConnText').style.color = 'var(--mc-gray)'; }
-
-  // Update discovery panel
-  const dp = $('discoveryPanel');
-  if (dp) {
-    dp.classList.remove('connected', 'disconnected');
-    if (status === 'online') dp.classList.add('connected');
-    else if (status === 'offline') dp.classList.add('disconnected');
+  if (status === 'online') {
+    sbDot.style.display = ''; sbDot.className = 'conn-dot online';
+    $('sbConnText').textContent = '已连接'; $('sbConnText').style.color = 'var(--mc-green)';
+  } else if (status === 'connecting') {
+    sbDot.style.display = ''; sbDot.className = 'conn-dot connecting';
+    $('sbConnText').textContent = '连接中...'; $('sbConnText').style.color = 'var(--mc-yellow)';
+  } else {
+    sbDot.style.display = 'none';
+    $('sbConnText').textContent = '离线'; $('sbConnText').style.color = 'var(--mc-gray)';
   }
-  const dpText = $('discoveryText');
-  if (dpText) {
-    if (status === 'online') dpText.innerHTML = `已连接: <strong style="color:var(--mc-green)">${state.peerName || '对端'}</strong>`;
-    else if (status === 'connecting') dpText.innerHTML = `正在与 <strong>${state.peerName || '对端'}</strong> 建立连接...`;
-    else dpText.innerHTML = `正在广播发现信号... 房间: <strong id="discoveryRoom">${state.room}</strong>`;
+
+  // Update banners
+  const banner = $('connectBanner');
+  const cbIcon = $('cbIcon');
+  const cbText = $('cbText');
+  banner.classList.remove('connected');
+  if (status === 'online') {
+    banner.classList.add('connected');
+    cbIcon.style.background = 'var(--mc-green)';
+    cbText.innerHTML = `<strong style="color:var(--mc-green)">已连接</strong> — 对端: ${state.peerName || '未知'}`;
+  } else if (status === 'connecting') {
+    cbIcon.style.background = 'var(--mc-yellow)';
+    cbText.innerHTML = `<strong style="color:var(--mc-yellow)">连接中...</strong> — 正在与 ${state.peerName || '对端'} 建立连接`;
+  } else {
+    cbIcon.style.background = 'var(--mc-red)';
+    cbText.innerHTML = `<strong>当前未连接</strong> — 请进入「建立连接」页面选择连接方式`;
+  }
+
+  const banner2 = $('connectBanner2');
+  const cbIcon2 = $('cbIcon2');
+  const cbText2 = $('cbText2');
+  const connStatusText = $('connStatusText');
+  const connPeerText = $('connPeerText');
+  banner2.classList.remove('connected');
+  if (status === 'online') {
+    banner2.classList.add('connected');
+    cbIcon2.style.background = 'var(--mc-green)';
+    connStatusText.textContent = '已连接';
+    connStatusText.style.color = 'var(--mc-green)';
+    connPeerText.textContent = ' ← ' + (state.peerName || '');
+  } else if (status === 'connecting') {
+    cbIcon2.style.background = 'var(--mc-yellow)';
+    connStatusText.textContent = '连接中...';
+    connStatusText.style.color = 'var(--mc-yellow)';
+    connPeerText.textContent = ' ← ' + (state.peerName || '');
+  } else {
+    cbIcon2.style.background = 'var(--mc-red)';
+    connStatusText.textContent = '未连接';
+    connStatusText.style.color = 'var(--mc-red)';
+    connPeerText.textContent = '';
   }
 
   $('btnStartSend').disabled = !(state.connected && state.sendQueue.length > 0 && !state.sending);
@@ -1283,9 +1498,14 @@ function createRTC() {
     log(`RTC状态: ${rtc.connectionState}`, rtc.connectionState === 'connected' ? 'ok' : 'info');
     if (rtc.connectionState === 'connected') {
       setConnStatus('online', '已连接');
+      showToast('连接已建立!', 'success');
     } else if (rtc.connectionState === 'connecting' || rtc.connectionState === 'checking') {
       setConnStatus('connecting', '连接中...');
-    } else if (rtc.connectionState === 'failed' || rtc.connectionState === 'disconnected' || rtc.connectionState === 'closed') {
+    } else if (rtc.connectionState === 'failed') {
+      setConnStatus('offline', '连接失败');
+      showToast('连接失败，请重试', 'error');
+      if (state.dataChannel) { try { state.dataChannel.close(); } catch(e) {} state.dataChannel = null; }
+    } else if (rtc.connectionState === 'disconnected' || rtc.connectionState === 'closed') {
       setConnStatus('offline', '已断开');
       if (state.dataChannel) { try { state.dataChannel.close(); } catch(e) {} state.dataChannel = null; }
     }
@@ -1311,6 +1531,7 @@ function setupDataChannel(dc) {
     log('数据通道已打开', 'ok');
     setConnStatus('online', '已连接');
     sendCtrl({ t: 'hello', name: state.deviceName });
+    showToast('数据通道已就绪', 'success');
   };
 
   dc.onclose = () => {
@@ -1336,22 +1557,29 @@ async function waitForIce(rtc) {
       }
     };
     rtc.addEventListener('icegatheringstatechange', check);
-    setTimeout(resolve, 8000); // 8s timeout
+    setTimeout(resolve, 8000);
   });
 }
 
 // ===== BroadcastChannel LAN Discovery =====
 function initBroadcast() {
+  if (!state.bcSupported) {
+    $('bcUnsupported').classList.remove('hidden');
+    $('broadcastPanel').classList.add('hidden');
+    return;
+  }
   if (state.bc) { try { state.bc.close(); } catch(e) {} }
   const channelName = BROADCAST_CHANNEL_PREFIX + state.room;
   try {
     state.bc = new BroadcastChannel(channelName);
     state.bc.onmessage = (e) => handleBroadcastMsg(e.data);
     log(`广播通道已开启: ${channelName}`, 'ok');
+    $('bcUnsupported').classList.add('hidden');
+    $('broadcastPanel').classList.remove('hidden');
     broadcastPresence();
   } catch(err) {
     log(`广播通道不可用: ${err.message}`, 'warn');
-    $('discoveryPanel').style.display = 'none';
+    $('bcUnsupported').classList.remove('hidden');
   }
 }
 
@@ -1364,8 +1592,6 @@ function broadcastPresence() {
     ts: Date.now(),
   });
 }
-
-// handleBroadcastMsg is defined below (complete version with ICE support)
 
 function renderBroadcastPeers() {
   const container = $('peerList');
@@ -1380,7 +1606,7 @@ function renderBroadcastPeers() {
     const avatar = el('div', { class: 'bp-avatar', text: info.name.charAt(0).toUpperCase() });
     const infoDiv = el('div', { class: 'bp-info' });
     infoDiv.appendChild(el('div', { class: 'bp-name', text: info.name }));
-    infoDiv.appendChild(el('div', { class: 'bp-meta', text: `ID: ${id.substr(0,8)} | 同房间广播发现` }));
+    infoDiv.appendChild(el('div', { class: 'bp-meta', text: `ID: ${id.substr(0,8)} | 同房间广播` }));
     item.appendChild(avatar);
     item.appendChild(infoDiv);
     const badge = el('span', { class: 'bp-badge', text: '在线' });
@@ -1392,11 +1618,10 @@ function renderBroadcastPeers() {
   }
 }
 
-// Heartbeat to keep presence alive and detect departures
+// Heartbeat
 setInterval(() => {
   if (state.bc && state.connectMethod === 'broadcast') {
     broadcastPresence();
-    // Clean stale peers (not seen in 10s)
     const now = Date.now();
     let changed = false;
     for (const [id, info] of state.bcPeers) {
@@ -1410,95 +1635,65 @@ setInterval(() => {
   }
 }, BROADCAST_HEARTBEAT);
 
-// Announce departure
 window.addEventListener('beforeunload', () => {
   if (state.bc) {
     try { state.bc.postMessage({ t: 'bye', from: state.bcId }); } catch(e) {}
   }
 });
 
-// ===== Broadcast-based WebRTC Signaling =====
-// This is the key feature: use BroadcastChannel to relay SDP offers/answers
-// so two tabs/devices on the same network can connect without a server.
-// NOTE: BroadcastChannel only works between tabs on the same browser/device.
-// For cross-device LAN connection, we need a different approach (see below).
-
+// ===== Broadcast WebRTC Signaling =====
 async function initiateBroadcastConnect(peerId, peerName) {
   try {
     log(`向 ${peerName} 发起连接...`, 'info');
     const rtc = createRTC();
-
-    // Relay ICE candidates via broadcast
     rtc.onicecandidate = (e) => {
       if (e.candidate && state.bc) {
         state.bc.postMessage({
-          t: 'ice-broadcast',
-          to: peerId,
-          from: state.bcId,
-          candidate: e.candidate,
+          t: 'ice-broadcast', to: peerId, from: state.bcId, candidate: e.candidate,
         });
       }
     };
-
     const dc = rtc.createDataChannel('ghc');
     setupDataChannel(dc);
-
     const offer = await rtc.createOffer();
     await rtc.setLocalDescription(offer);
-
-    // Send offer via broadcast
     state.bc.postMessage({
-      t: 'offer-broadcast',
-      to: peerId,
-      from: state.bcId,
-      name: state.deviceName,
-      sdp: rtc.localDescription,
+      t: 'offer-broadcast', to: peerId, from: state.bcId, name: state.deviceName, sdp: rtc.localDescription,
     });
-
     state.peerName = peerName;
     $('infoPeer').textContent = peerName;
     $('sbPeer').textContent = '对端: ' + peerName;
     setConnStatus('connecting', '连接中...');
     log(`已发送连接邀请给 ${peerName}`, 'info');
+    showToast(`正在连接 ${peerName}...`, 'info');
   } catch(err) {
     log(`发起连接失败: ${err.message}`, 'err');
     beepError();
+    showToast('连接失败: ' + err.message, 'error');
   }
 }
 
 async function handleBroadcastOfferRelay(msg) {
-  // We received an offer from a peer via broadcast
   try {
     log(`收到 ${msg.name} 的连接邀请`, 'info');
+    showToast(`收到 ${msg.name} 的连接邀请`, 'info');
     state.peerName = msg.name;
     $('infoPeer').textContent = msg.name;
     $('sbPeer').textContent = '对端: ' + msg.name;
-
     const rtc = createRTC();
     rtc.onicecandidate = (e) => {
       if (e.candidate && state.bc) {
         state.bc.postMessage({
-          t: 'ice-broadcast',
-          to: msg.from,
-          from: state.bcId,
-          candidate: e.candidate,
+          t: 'ice-broadcast', to: msg.from, from: state.bcId, candidate: e.candidate,
         });
       }
     };
-
     await rtc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
     const answer = await rtc.createAnswer();
     await rtc.setLocalDescription(answer);
-
-    // Send answer via broadcast
     state.bc.postMessage({
-      t: 'answer-broadcast',
-      to: msg.from,
-      from: state.bcId,
-      name: state.deviceName,
-      sdp: rtc.localDescription,
+      t: 'answer-broadcast', to: msg.from, from: state.bcId, name: state.deviceName, sdp: rtc.localDescription,
     });
-
     setConnStatus('connecting', '连接中...');
     log(`已回应 ${msg.name} 的连接邀请`, 'ok');
   } catch(err) {
@@ -1516,35 +1711,6 @@ async function handleBroadcastAnswerRelay(msg) {
   }
 }
 
-// Handle ICE candidates from broadcast
-async function handleBroadcastMsg(msg) {
-  if (!msg || msg.from === state.bcId) return;
-
-  if (msg.t === 'hello') {
-    const isNew = !state.bcPeers.has(msg.from);
-    state.bcPeers.set(msg.from, { name: msg.name, lastSeen: Date.now() });
-    if (isNew) {
-      log(`发现设备: ${msg.name}`, 'ok');
-      renderBroadcastPeers();
-    } else {
-      // Update lastSeen
-      state.bcPeers.get(msg.from).lastSeen = Date.now();
-    }
-  } else if (msg.t === 'bye') {
-    if (state.bcPeers.has(msg.from)) {
-      log(`设备离开: ${state.bcPeers.get(msg.from).name}`, 'warn');
-      state.bcPeers.delete(msg.from);
-      renderBroadcastPeers();
-    }
-  } else if (msg.t === 'offer-broadcast') {
-    handleBroadcastOfferRelay(msg);
-  } else if (msg.t === 'answer-broadcast') {
-    handleBroadcastAnswerRelay(msg);
-  } else if (msg.t === 'ice-broadcast') {
-    handleBroadcastIceRelay(msg);
-  }
-}
-
 async function handleBroadcastIceRelay(msg) {
   try {
     if (!state.rtc || !msg.candidate) return;
@@ -1554,6 +1720,24 @@ async function handleBroadcastIceRelay(msg) {
   }
 }
 
+function handleBroadcastMsg(msg) {
+  if (!msg || msg.from === state.bcId) return;
+  if (msg.t === 'hello') {
+    const isNew = !state.bcPeers.has(msg.from);
+    state.bcPeers.set(msg.from, { name: msg.name, lastSeen: Date.now() });
+    if (isNew) { log(`发现设备: ${msg.name}`, 'ok'); renderBroadcastPeers(); }
+    else { state.bcPeers.get(msg.from).lastSeen = Date.now(); }
+  } else if (msg.t === 'bye') {
+    if (state.bcPeers.has(msg.from)) {
+      log(`设备离开: ${state.bcPeers.get(msg.from).name}`, 'warn');
+      state.bcPeers.delete(msg.from);
+      renderBroadcastPeers();
+    }
+  } else if (msg.t === 'offer-broadcast') { handleBroadcastOfferRelay(msg); }
+  else if (msg.t === 'answer-broadcast') { handleBroadcastAnswerRelay(msg); }
+  else if (msg.t === 'ice-broadcast') { handleBroadcastIceRelay(msg); }
+}
+
 // ===== Connection Method Selection =====
 $('methodBroadcast').addEventListener('click', () => {
   state.connectMethod = 'broadcast';
@@ -1561,8 +1745,7 @@ $('methodBroadcast').addEventListener('click', () => {
   $('methodManual').classList.remove('selected');
   $('broadcastPanel').classList.remove('hidden');
   $('manualPanel').classList.add('hidden');
-  $('discoveryPanel').style.display = '';
-  log('已切换到: 局域网自动发现', 'info');
+  log('已切换到: 自动发现', 'info');
 });
 
 $('methodManual').addEventListener('click', () => {
@@ -1571,7 +1754,6 @@ $('methodManual').addEventListener('click', () => {
   $('methodBroadcast').classList.remove('selected');
   $('broadcastPanel').classList.add('hidden');
   $('manualPanel').classList.remove('hidden');
-  $('discoveryPanel').style.display = 'none';
   log('已切换到: 手动密钥交换', 'info');
 });
 
@@ -1581,7 +1763,6 @@ $('btnChangeRoom').addEventListener('click', () => {
   state.room = newRoom;
   $('infoRoom').textContent = newRoom;
   $('topbarRoom').textContent = '房间: ' + newRoom;
-  $('discoveryRoom').textContent = newRoom;
   state.bcPeers.clear();
   renderBroadcastPeers();
   initBroadcast();
@@ -1595,75 +1776,100 @@ $('btnGenOffer').addEventListener('click', async () => {
     const rtc = createRTC();
     const dc = rtc.createDataChannel('ghc');
     setupDataChannel(dc);
-
     const offer = await rtc.createOffer();
     await rtc.setLocalDescription(offer);
     await waitForIce(rtc);
-
-    const payload = {
-      protocol: SIGNAL_PROTOCOL,
-      type: 'offer',
-      name: state.deviceName,
-      sdp: rtc.localDescription,
-    };
+    const payload = { protocol: SIGNAL_PROTOCOL, type: 'offer', name: state.deviceName, sdp: rtc.localDescription };
     const encoded = btoa(JSON.stringify(payload));
     $('txtOffer').value = encoded;
-    log('邀请密钥已生成，发送给对方', 'ok');
+    log('邀请密钥已生成', 'ok');
     beepNotify();
+    showToast('邀请密钥已生成，请发送给对方', 'success');
   } catch(err) {
     log(`生成邀请失败: ${err.message}`, 'err');
     beepError();
+    showToast('生成失败: ' + err.message, 'error');
   }
 });
 
 $('btnCopyOffer').addEventListener('click', () => {
   const v = $('txtOffer').value;
-  if (!v) return;
+  if (!v) { showToast('请先生成密钥', 'warn'); return; }
   navigator.clipboard.writeText(v).then(() => {
-    log('邀请密钥已复制到剪贴板', 'ok');
-  }).catch(() => log('复制失败，请手动复制', 'warn'));
+    log('邀请密钥已复制', 'ok');
+    showToast('密钥已复制到剪贴板', 'success');
+  }).catch(() => {
+    // Fallback: select text
+    $('txtOffer').select();
+    document.execCommand('copy');
+    showToast('密钥已复制', 'success');
+  });
+});
+
+$('btnShareOffer').addEventListener('click', () => {
+  const v = $('txtOffer').value;
+  if (!v) { showToast('请先生成密钥', 'warn'); return; }
+  if (navigator.share) {
+    navigator.share({
+      title: 'GHC 传 - 连接密钥',
+      text: v,
+    }).then(() => log('密钥已分享', 'ok')).catch(() => {});
+  } else {
+    $('btnCopyOffer').click();
+  }
 });
 
 $('btnApplyAnswer').addEventListener('click', async () => {
   try {
     const encoded = $('txtAnswer').value.trim();
-    if (!encoded) { log('请先粘贴密钥', 'warn'); return; }
+    if (!encoded) { showToast('请先粘贴密钥', 'warn'); return; }
     const payload = JSON.parse(atob(encoded));
 
     if (payload.type === 'answer') {
-      // We are the offerer, applying remote answer
       const rtc = state.rtc || createRTC();
       await rtc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
       log('应答已应用，正在建立连接...', 'ok');
       setConnStatus('connecting', '连接中...');
+      showToast('正在建立连接...', 'info');
     } else if (payload.type === 'offer') {
-      // We are the answerer
       state.peerName = payload.name || '未知设备';
       $('infoPeer').textContent = state.peerName;
       $('sbPeer').textContent = '对端: ' + state.peerName;
-
       const rtc = createRTC();
       await rtc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
       const answer = await rtc.createAnswer();
       await rtc.setLocalDescription(answer);
       await waitForIce(rtc);
-
       const resp = { protocol: SIGNAL_PROTOCOL, type: 'answer', name: state.deviceName, sdp: rtc.localDescription };
       $('txtAnswer').value = btoa(JSON.stringify(resp));
       $('txtAnswer').readOnly = true;
-      log('应答密钥已生成，发送给对方', 'ok');
+      log('应答密钥已生成', 'ok');
       beepNotify();
+      showToast('应答密钥已生成，请发回给发起方', 'success');
       setConnStatus('connecting', '连接中...');
     } else {
       log('无效的密钥格式', 'err');
+      showToast('无效的密钥格式', 'error');
     }
   } catch(err) {
     log(`处理密钥失败: ${err.message}`, 'err');
     beepError();
+    showToast('处理失败: ' + err.message, 'error');
   }
 });
 
-// SDP mode change
+$('btnCopyAnswer').addEventListener('click', () => {
+  const v = $('txtAnswer').value;
+  if (!v) { showToast('没有可复制的应答', 'warn'); return; }
+  navigator.clipboard.writeText(v).then(() => {
+    showToast('应答密钥已复制', 'success');
+  }).catch(() => {
+    $('txtAnswer').select();
+    document.execCommand('copy');
+    showToast('应答密钥已复制', 'success');
+  });
+});
+
 $('sdpMode').addEventListener('change', () => {
   const isOffer = $('sdpMode').value === 'offer';
   $('sdpStep1').style.display = isOffer ? '' : 'none';
@@ -1686,9 +1892,12 @@ $('sdpMode').addEventListener('change', () => {
 // ===== Quick Connect =====
 $('btnQuickConnect').addEventListener('click', () => {
   document.querySelector('[data-page="page-connect"]').click();
-  // Default to broadcast method
   $('methodBroadcast').click();
   log('请在"建立连接"页面选择目标设备', 'info');
+});
+
+$('btnGoConnect').addEventListener('click', () => {
+  document.querySelector('[data-page="page-connect"]').click();
 });
 
 $('btnDisconnect').addEventListener('click', () => {
@@ -1731,6 +1940,7 @@ function addFiles(files) {
   for (const f of files) {
     if (f.size > MAX_FILE_SIZE) {
       log(`文件过大 (${fmtSize(f.size)}), 跳过: ${f.name}`, 'warn');
+      showToast(`文件过大: ${f.name}`, 'warn');
       continue;
     }
     state.sendQueue.push({
@@ -1759,7 +1969,7 @@ function updateSendListUI() {
       <span class="fi-status ${item.status}">${statusText(item.status)}</span>`;
     const delBtn = el('button', { class: 'btn btn-red btn-small', text: 'X' });
     delBtn.addEventListener('click', () => {
-      if (state.sending && state.currentSend?.index === i) { log('正在发送中，无法删除', 'warn'); return; }
+      if (state.sending && state.currentSend?.index === i) { showToast('正在发送中，无法删除', 'warn'); return; }
       state.sendQueue.splice(i, 1);
       updateSendListUI();
       updateBadges();
@@ -1785,14 +1995,14 @@ function updateBadges() {
 
 // ===== Sending Files =====
 $('btnStartSend').addEventListener('click', () => {
-  if (!state.connected) { log('请先建立连接', 'warn'); return; }
-  if (state.sendQueue.length === 0) { log('没有待发送文件', 'warn'); return; }
-  if (state.sending) { log('正在发送中...', 'warn'); return; }
+  if (!state.connected) { showToast('请先建立连接', 'warn'); return; }
+  if (state.sendQueue.length === 0) { showToast('没有待发送文件', 'warn'); return; }
+  if (state.sending) { showToast('正在发送中...', 'warn'); return; }
   startSending();
 });
 
 $('btnClearSend').addEventListener('click', () => {
-  if (state.sending) { log('正在发送中，无法清空', 'warn'); return; }
+  if (state.sending) { showToast('正在发送中，无法清空', 'warn'); return; }
   state.sendQueue = [];
   updateSendListUI();
   updateBadges();
@@ -1821,10 +2031,12 @@ async function startSending() {
       addHistory({ name: item.name, size: item.size, dir: 'send', status: 'done', dur, speed });
       log(`发送完成: ${item.name} (${fmtSize(item.size)}, ${fmtSpeed(speed)})`, 'ok');
       beepComplete();
+      showToast(`发送完成: ${item.name}`, 'success');
     } catch(err) {
       item.status = 'error';
       log(`发送失败: ${item.name} - ${err.message}`, 'err');
       beepError();
+      showToast(`发送失败: ${err.message}`, 'error');
     }
 
     hideActiveSend();
@@ -1985,6 +2197,7 @@ function finalizeRecvFile(meta, buffers) {
   addHistory({ name: meta.name, size: meta.size, dir: 'recv', status: 'done', dur, speed });
   log(`接收完成: ${meta.name} (${fmtSize(meta.size)}, ${fmtSpeed(speed)})`, 'ok');
   beepComplete();
+  showToast(`接收完成: ${meta.name}`, 'success');
 
   $('sbRecv').textContent = '接收: ' + fmtSize(state.bytesRecv);
   $('infoRecv').textContent = fmtSize(state.bytesRecv);
@@ -2022,8 +2235,9 @@ function handleCtrl(msg) {
       $('sbPeer').textContent = '对端: ' + msg.name;
       break;
     case 'file-start':
-      log(` incoming: ${msg.name} (${fmtSize(msg.size)})`, 'info');
+      log(`接收: ${msg.name} (${fmtSize(msg.size)})`, 'info');
       beepNotify();
+      showToast(`正在接收: ${msg.name}`, 'info');
       const meta = {
         _id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
         name: msg.name, size: msg.size, type: msg.type,
@@ -2048,6 +2262,7 @@ function handleCtrl(msg) {
     case 'file-cancel':
       log('对方取消了文件传输', 'warn');
       beepError();
+      showToast('对方取消了传输', 'warn');
       break;
   }
 }
@@ -2108,7 +2323,7 @@ $('btnClearHistory').addEventListener('click', () => {
 });
 
 // ===== Settings Persistence =====
-const SETTINGS_KEY = 'ghc_settings_v3';
+const SETTINGS_KEY = 'ghc_settings_v4';
 
 function loadSettings() {
   try {
@@ -2119,7 +2334,7 @@ function loadSettings() {
     if (s.chunkSize) { state.chunkSize = s.chunkSize; $('setChunkSize').value = s.chunkSize; }
     if (s.backpressure) { state.backpressure = s.backpressure; $('setBackpressure').value = s.backpressure; }
     if (s.signalUrl) { state.signalUrl = s.signalUrl; $('setSignalUrl').value = s.signalUrl; }
-    if (s.room) { state.room = s.room; $('setRoom').value = s.room; $('roomInput').value = s.room; $('discoveryRoom').textContent = s.room; }
+    if (s.room) { state.room = s.room; $('setRoom').value = s.room; $('roomInput').value = s.room; }
     if (s.audioEnabled !== undefined) { state.audioEnabled = s.audioEnabled; $('setAudio').value = s.audioEnabled ? 'on' : 'off'; }
     if (s.iceServers) { state.iceServers = s.iceServers; $('setIceServers').value = JSON.stringify(s.iceServers, null, 2); }
     log('已加载保存的设置', 'ok');
@@ -2143,17 +2358,16 @@ function saveSettings() {
     state.audioEnabled = s.audioEnabled;
     if (s.iceServers.length > 0) state.iceServers = s.iceServers;
     if (s.signalUrl) state.signalUrl = s.signalUrl;
-    if (s.room) { state.room = s.room; $('roomInput').value = s.room; $('discoveryRoom').textContent = s.room; }
+    if (s.room) { state.room = s.room; $('roomInput').value = s.room; }
 
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
     updateDeviceName();
     $('sidebarDevInput').value = s.deviceName;
     log('设置已保存', 'ok');
     beepNotify();
-
-    // Re-init broadcast with new room
+    showToast('设置已保存', 'success');
     initBroadcast();
-  } catch(e) { log(`保存设置失败: ${e.message}`, 'err'); beepError(); }
+  } catch(e) { log(`保存设置失败: ${e.message}`, 'err'); beepError(); showToast('保存失败', 'error'); }
 }
 
 $('btnSaveSettings').addEventListener('click', saveSettings);
@@ -2179,10 +2393,11 @@ $('importFile').addEventListener('change', (e) => {
       if (s.chunkSize) $('setChunkSize').value = s.chunkSize;
       if (s.backpressure) $('setBackpressure').value = s.backpressure;
       if (s.signalUrl) $('setSignalUrl').value = s.signalUrl;
-      if (s.room) { $('setRoom').value = s.room; $('roomInput').value = s.room; $('discoveryRoom').textContent = s.room; }
+      if (s.room) { $('setRoom').value = s.room; $('roomInput').value = s.room; }
       if (s.audioEnabled !== undefined) $('setAudio').value = s.audioEnabled ? 'on' : 'off';
       if (s.iceServers) $('setIceServers').value = JSON.stringify(s.iceServers, null, 2);
       log('配置已导入，点击保存生效', 'ok'); beepNotify();
+      showToast('配置已导入', 'success');
     } catch(err) { log(`导入失败: ${err.message}`, 'err'); }
   };
   reader.readAsText(f);
@@ -2208,31 +2423,24 @@ function detectEnvironment() {
 
   if (isFile) {
     log('运行环境: 本地文件 (file://)', 'warn');
-    log('提示: 本地文件可直接使用，推荐用Chrome/Edge打开', 'info');
   } else if (isHttps) {
     log(`运行环境: HTTPS (${window.location.hostname})`, 'ok');
-    log('提示: HTTPS下BroadcastChannel正常工作', 'info');
+    if (isGithubPages) {
+      $('httpsWarn').classList.remove('hidden');
+      log('GitHub Pages 托管版本 - 注意跨设备连接限制', 'warn');
+    }
   } else if (isLocalhost) {
     log('运行环境: 本地服务器 (localhost)', 'ok');
-  } else {
-    log(`运行环境: ${proto}//${window.location.hostname}`, 'info');
   }
 
-  // Check BroadcastChannel support
-  if (typeof BroadcastChannel === 'undefined') {
-    log('警告: 当前浏览器不支持BroadcastChannel', 'warn');
-    log('请使用Chrome 54+ / Firefox 44+ / Edge 79+', 'warn');
+  if (!state.bcSupported) {
+    log('当前浏览器不支持 BroadcastChannel', 'warn');
+    log('请使用 Chrome 54+ / Firefox 44+ / Edge 79+ / Safari 15.4+', 'warn');
   }
 
-  // Check WebRTC support
   if (typeof RTCPeerConnection === 'undefined') {
-    log('错误: 当前浏览器不支持WebRTC', 'err');
-  }
-
-  // Check if opened from GitHub Pages
-  if (isGithubPages) {
-    log('检测到GitHub Pages托管版本', 'info');
-    log('注意: 两人需打开同一URL才能通过BroadcastChannel发现', 'info');
+    log('错误: 当前浏览器不支持 WebRTC', 'err');
+    showToast('浏览器不支持 WebRTC，无法使用', 'error');
   }
 }
 
@@ -2243,19 +2451,21 @@ function init() {
   updateDeviceName();
   $('infoRoom').textContent = state.room;
   $('topbarRoom').textContent = '房间: ' + state.room;
-  $('discoveryRoom').textContent = state.room;
   setConnStatus('offline', '未连接');
-  log('GHC v3.0.0 已就绪', 'ok');
+  log('GHC 传 v4.0.0 已就绪', 'ok');
   log(`设备名: ${state.deviceName}`, 'info');
-  log(`分块大小: ${fmtSize(state.chunkSize)} | 背压: ${fmtSize(state.backpressure)}`, 'data');
-  log('提示: 进入"建立连接"页面选择连接方式', 'info');
+  log(`分块: ${fmtSize(state.chunkSize)} | 背压: ${fmtSize(state.backpressure)}`, 'data');
+  log('提示: 进入「建立连接」页面选择连接方式', 'info');
+  if (state.isMobile) {
+    log('检测到移动设备，侧边栏已折叠', 'info');
+  }
   startTimer();
   renderHistory();
   renderBroadcastPeers();
   initBroadcast();
 }
 
-// Paste SDP detection
+// ===== Paste SDP detection =====
 document.addEventListener('paste', (e) => {
   const text = (e.clipboardData || window.clipboardData).getData('text');
   if (text && text.length > 20 && document.querySelector('.page.active')?.id === 'page-connect') {
@@ -2263,7 +2473,8 @@ document.addEventListener('paste', (e) => {
       const parsed = JSON.parse(atob(text.trim()));
       if (parsed.protocol === SIGNAL_PROTOCOL) {
         $('txtAnswer').value = text.trim();
-        log('检测到密钥已粘贴，准备处理...', 'info');
+        log('检测到密钥已粘贴', 'info');
+        showToast('密钥已自动填入', 'success');
       }
     } catch(e) {}
   }
