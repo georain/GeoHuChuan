@@ -2283,10 +2283,14 @@ tr:hover td { background: var(--primary-soft); }
     var url = $('signalUrl').value.trim();
     if (!url) url = STATE.signalServer;
     if (!url) { toast('请先填写信令服务器地址', 'warning'); return; }
+    // 规范化协议前缀：https->wss, http->ws, 无前缀自动补 ws://
+    url = url.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
     if (!/^wss?:\/\//i.test(url)) url = 'ws://' + url;
+    // 校验：必须包含有效主机名，否则 new WebSocket 会抛 SyntaxError
+    if (!/^wss?:\/\/[\w.-]+(:\d+)?($|\/)/i.test(url)) { toast('地址格式无效，示例: ws://192.168.1.100:8787', 'error'); return; }
     var ws;
     try { ws = new WebSocket(url); }
-    catch (e) { toast('地址格式无效', 'error'); return; }
+    catch (e) { toast('地址格式无效，示例: ws://192.168.1.100:8787', 'error'); return; }
     signal.ws = ws;
     setSignalStatus('正在连接...', '');
     ws.onopen = function () {
