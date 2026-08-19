@@ -3,117 +3,202 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>GHC 传 - 局域网文件互传</title>
+<title>GeoRainCONNECT - 局域网文件互传</title>
+<script>
+(function () {
+  try {
+    var saved = localStorage.getItem('ghc-theme');
+    if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) {}
+})();
+</script>
 <style>
+/* ========== 主题变量 ========== */
+:root {
+  --bg-a: #ffffff;
+  --bg-b: #eef3fa;
+  --bg-c: #eafaf2;
+  --surface: rgba(255,255,255,0.66);
+  --surface-strong: rgba(255,255,255,0.88);
+  --surface-hover: rgba(255,255,255,0.96);
+  --border: rgba(15,23,42,0.08);
+  --border-strong: rgba(15,23,42,0.15);
+  --text: #1e293b;
+  --text-2: #526072;
+  --text-3: #8a94a6;
+  --primary: #10b981;
+  --primary-deep: #059669;
+  --primary-soft: rgba(16,185,129,0.12);
+  --blue: #3b82f6;
+  --blue-soft: rgba(59,130,246,0.12);
+  --orange: #f59e0b;
+  --orange-soft: rgba(245,158,11,0.14);
+  --red: #ef4444;
+  --red-soft: rgba(239,68,68,0.12);
+  --shadow: 0 10px 34px rgba(15,23,42,0.07);
+  --shadow-hover: 0 16px 44px rgba(15,23,42,0.13);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --blur: saturate(170%) blur(18px);
+  --input-bg: rgba(255,255,255,0.8);
+  --log-bg: rgba(248,250,252,0.88);
+}
+[data-theme='dark'] {
+  --bg-a: #0b1220;
+  --bg-b: #101a2e;
+  --bg-c: #0e1f1c;
+  --surface: rgba(17,25,42,0.6);
+  --surface-strong: rgba(17,25,42,0.85);
+  --surface-hover: rgba(24,34,54,0.92);
+  --border: rgba(148,163,184,0.12);
+  --border-strong: rgba(148,163,184,0.24);
+  --text: #e2e8f0;
+  --text-2: #9aa7bd;
+  --text-3: #64748b;
+  --primary: #34d399;
+  --primary-deep: #10b981;
+  --primary-soft: rgba(52,211,153,0.14);
+  --blue: #60a5fa;
+  --blue-soft: rgba(96,165,250,0.14);
+  --orange: #fbbf24;
+  --orange-soft: rgba(251,191,36,0.14);
+  --red: #f87171;
+  --red-soft: rgba(248,113,113,0.14);
+  --shadow: 0 10px 34px rgba(0,0,0,0.35);
+  --shadow-hover: 0 16px 44px rgba(0,0,0,0.5);
+  --input-bg: rgba(30,41,59,0.7);
+  --log-bg: rgba(10,16,30,0.8);
+}
+
 /* ========== 基础重置 ========== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }
 body {
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: #0f0f0f;
-  color: #e0e0e0;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background:
+    radial-gradient(1100px 500px at 85% -10%, var(--bg-c) 0%, transparent 55%),
+    radial-gradient(900px 460px at -10% 110%, var(--bg-b) 0%, transparent 55%),
+    var(--bg-a);
+  color: var(--text);
   display: flex;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
+  transition: background 0.45s ease, color 0.35s ease;
 }
-
-/* ========== 像素字体 ========== */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-.pixel-font { font-family: "Press Start 2P", monospace; }
 
 /* ========== 侧边栏 ========== */
 .sidebar {
-  width: 200px;
-  min-width: 200px;
-  background: #1a1a1a;
-  border-right: 3px solid #000;
+  width: 210px;
+  min-width: 210px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   z-index: 100;
   overflow-y: auto;
+  transition: background 0.4s ease, border-color 0.3s ease;
 }
 .sidebar-header {
-  padding: 16px 12px;
-  background: linear-gradient(180deg, #2d5a27 0%, #1e3d1a 100%);
-  border-bottom: 3px solid #000;
+  padding: 22px 16px 18px;
+  background: linear-gradient(140deg, var(--primary-soft), transparent 65%);
+  border-bottom: 1px solid var(--border);
   text-align: center;
 }
 .sidebar-header .logo {
-  font-family: "Press Start 2P", monospace;
-  font-size: 10px;
-  color: #fff;
-  text-shadow: 2px 2px 0 #000;
-  letter-spacing: 1px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--primary-deep);
+  transition: color 0.3s ease;
+  white-space: nowrap;
 }
-.sidebar-header .logo span { color: #8eff8e; }
-.sidebar-header .subtitle {
-  font-size: 9px;
-  color: #aaa;
-  margin-top: 4px;
-}
+.sidebar-header .logo span { color: var(--primary); }
+.sidebar-header .subtitle { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 12px;
+  padding: 13px 18px;
   border: none;
   background: transparent;
-  color: #bbb;
-  font-size: 13px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
-  border-bottom: 1px solid #2a2a2a;
-  transition: all 0.15s;
+  transition: background 0.25s ease, color 0.25s ease;
   text-align: left;
   width: 100%;
+  position: relative;
 }
-.nav-item:hover { background: #252525; color: #fff; }
+.nav-item:hover { background: var(--surface-hover); color: var(--text); }
 .nav-item.active {
-  background: #2d5a27;
-  color: #fff;
-  border-left: 4px solid #8eff8e;
-  padding-left: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+  font-weight: 600;
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 22%; bottom: 22%;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--primary);
 }
 .nav-icon {
-  width: 20px; height: 20px;
+  width: 18px; height: 18px;
   flex-shrink: 0;
   display: inline-block;
 }
+.nav-icon line, .nav-icon circle, .nav-icon rect, .nav-icon polyline, .nav-icon path { stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .nav-item .badge {
   margin-left: auto;
-  width: 8px; height: 8px;
-  border-radius: 0;
-  background: #444;
-  border: 1px solid #000;
+  min-width: 18px; height: 18px;
+  border-radius: 9px;
+  background: var(--text-3);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
-.nav-item .badge.online { background: #44b04b; box-shadow: 0 0 6px #44b04b; }
-.nav-item .badge.offline { background: #c0392b; }
-.nav-item .badge.connecting { background: #f39c12; animation: blink 1s infinite; }
+.nav-item .badge.online { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+.nav-item .badge.offline { background: var(--text-3); }
+.nav-item .badge.connecting { background: var(--orange); animation: blink 1s infinite; }
+.nav-item .badge.has-count { background: var(--orange); box-shadow: 0 0 8px var(--orange-soft); }
 
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
 .sidebar-footer {
   margin-top: auto;
-  padding: 12px;
-  border-top: 3px solid #000;
-  background: #151515;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-strong);
 }
 .sidebar-footer label {
-  font-size: 10px;
-  color: #888;
+  font-size: 11px;
+  color: var(--text-3);
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .sidebar-footer input {
   width: 100%;
-  padding: 6px 8px;
-  background: #0a0a0a;
-  border: 2px solid #333;
-  color: #8eff8e;
-  font-size: 12px;
-  font-family: "Press Start 2P", monospace;
+  padding: 9px 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.sidebar-footer input:focus { outline: none; border-color: #44b04b; }
+.sidebar-footer input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 
 /* ========== 主内容区 ========== */
 .main-content {
@@ -128,38 +213,66 @@ body {
 .top-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  background: #1a1a1a;
-  border-bottom: 3px solid #000;
-  min-height: 44px;
+  gap: 14px;
+  padding: 10px 20px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--border);
+  min-height: 52px;
+  z-index: 50;
+  transition: background 0.4s ease, border-color 0.3s ease;
 }
 .top-bar .page-title {
-  font-family: "Press Start 2P", monospace;
-  font-size: 10px;
-  color: #8eff8e;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-2);
+  text-transform: uppercase;
 }
 .top-bar .status-indicator {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
 }
 .status-dot {
   width: 10px; height: 10px;
-  border: 2px solid #000;
+  border-radius: 50%;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
-.status-dot.online { background: #44b04b; box-shadow: 0 0 8px #44b04b; }
-.status-dot.offline { background: #c0392b; }
-.status-dot.connecting { background: #f39c12; animation: blink 1s infinite; }
+.status-dot.online { background: var(--primary); box-shadow: 0 0 10px var(--primary); }
+.status-dot.offline { background: var(--red); }
+.status-dot.connecting { background: var(--orange); animation: blink 1s infinite; }
+
+/* 主题切换按钮 */
+.theme-toggle {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-strong);
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+.theme-toggle:hover { transform: rotate(18deg) scale(1.06); color: var(--primary); box-shadow: 0 4px 14px var(--primary-soft); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.theme-toggle .icon-moon { display: none; }
+[data-theme='dark'] .theme-toggle .icon-sun { display: none; }
+[data-theme='dark'] .theme-toggle .icon-moon { display: block; }
 
 /* 汉堡菜单 */
 .hamburger {
   display: none;
-  width: 32px; height: 32px;
-  background: #2d5a27;
-  border: 2px solid #000;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
   cursor: pointer;
   flex-direction: column;
   align-items: center;
@@ -168,8 +281,9 @@ body {
 }
 .hamburger span {
   display: block;
-  width: 18px; height: 2px;
-  background: #fff;
+  width: 16px; height: 2px;
+  border-radius: 2px;
+  background: var(--text-2);
 }
 
 /* 页面容器 */
@@ -177,200 +291,210 @@ body {
   display: none;
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 22px;
 }
-.page.active { display: block; }
+.page.active {
+  display: block;
+  animation: pageIn 0.38s ease both;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
 
 /* ========== 面板通用样式 ========== */
 .panel {
-  background: #1a1a1a;
-  border: 3px solid #000;
-  margin-bottom: 16px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: background 0.4s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
+.panel:hover { box-shadow: var(--shadow-hover); }
 .panel-header {
-  padding: 10px 14px;
-  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-  border-bottom: 2px solid #000;
+  padding: 14px 18px;
+  background: var(--surface-strong);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.panel-header h3 {
-  font-size: 12px;
-  color: #8eff8e;
-  font-family: "Press Start 2P", monospace;
+.panel-header h3::before {
+  content: '';
+  width: 4px; height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--primary), var(--blue));
 }
-.panel-body { padding: 16px; }
+.panel-body { padding: 18px; }
 
-/* ========== 方块按钮 ========== */
+/* ========== 圆角按钮 ========== */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 18px;
-  font-size: 13px;
-  font-weight: bold;
-  border: 3px solid #000;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
   cursor: pointer;
-  background: #44b04b;
+  background: var(--primary);
   color: #fff;
-  text-shadow: 1px 1px 0 #000;
-  box-shadow: 0 4px 0 #1e5a22, 0 5px 0 #000;
-  transition: transform 0.08s, box-shadow 0.08s;
-  font-family: "Segoe UI", sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px var(--primary-soft);
+  transition: transform 0.18s ease, box-shadow 0.25s ease, filter 0.25s ease, background 0.3s ease;
   user-select: none;
 }
-.btn:hover { filter: brightness(1.1); }
-.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1e5a22, 0 2px 0 #000; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.btn-blue { background: #5b9bd5; box-shadow: 0 4px 0 #2a5a8a, 0 5px 0 #000; }
-.btn-blue:active { box-shadow: 0 1px 0 #2a5a8a, 0 2px 0 #000; }
-.btn-red { background: #c0392b; box-shadow: 0 4px 0 #6a1a15, 0 5px 0 #000; }
-.btn-red:active { box-shadow: 0 1px 0 #6a1a15, 0 2px 0 #000; }
-.btn-gray { background: #555; box-shadow: 0 4px 0 #333, 0 5px 0 #000; }
-.btn-gray:active { box-shadow: 0 1px 0 #333, 0 2px 0 #000; }
-.btn-orange { background: #e67e22; box-shadow: 0 4px 0 #a05010, 0 5px 0 #000; }
-.btn-orange:active { box-shadow: 0 1px 0 #a05010, 0 2px 0 #000; }
-.btn-small { padding: 6px 12px; font-size: 11px; }
+.btn:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 8px 20px var(--primary-soft); }
+.btn:active { transform: translateY(1px) scale(0.98); box-shadow: 0 2px 8px var(--primary-soft); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-blue { background: var(--blue); box-shadow: 0 4px 14px var(--blue-soft); }
+.btn-blue:hover { box-shadow: 0 8px 20px var(--blue-soft); }
+.btn-red { background: var(--red); box-shadow: 0 4px 14px var(--red-soft); }
+.btn-red:hover { box-shadow: 0 8px 20px var(--red-soft); }
+.btn-gray { background: var(--text-3); box-shadow: 0 4px 12px rgba(148,163,184,0.3); }
+.btn-orange { background: var(--orange); box-shadow: 0 4px 14px var(--orange-soft); }
+.btn-orange:hover { box-shadow: 0 8px 20px var(--orange-soft); }
+.btn-small { padding: 7px 13px; font-size: 12px; border-radius: 10px; }
 
 /* ========== 状态卡片 ========== */
 .status-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
 }
 .status-card {
-  background: #1a1a1a;
-  border: 3px solid #000;
-  padding: 14px;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+  transition: background 0.4s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
+.status-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
 .status-card .card-label {
-  font-size: 10px;
-  color: #888;
+  font-size: 11px;
+  color: var(--text-3);
   text-transform: uppercase;
-  margin-bottom: 6px;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
 }
 .status-card .card-value {
-  font-family: "Press Start 2P", monospace;
-  font-size: 14px;
-  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
 }
-.status-card .card-value.green { color: #44b04b; }
-.status-card .card-value.red { color: #c0392b; }
-.status-card .card-value.yellow { color: #f39c12; }
-.status-card .card-value.blue { color: #5b9bd5; }
+.status-card .card-value.green { color: var(--primary-deep); }
+.status-card .card-value.red { color: var(--red); }
+.status-card .card-value.yellow { color: var(--orange); }
+.status-card .card-value.blue { color: var(--blue); }
+#cardApkCount { color: var(--orange); }
 
 /* ========== 进度条 ========== */
 .progress-bar {
   width: 100%;
-  height: 28px;
-  background: #0a0a0a;
-  border: 2px solid #333;
+  height: 22px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
   position: relative;
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  background: repeating-linear-gradient(
-    45deg,
-    #44b04b 0px,
-    #44b04b 8px,
-    #3a9a40 8px,
-    #3a9a40 16px
-  );
+  background: linear-gradient(90deg, var(--primary), #34d399);
   width: 0%;
-  transition: width 0.3s;
+  border-radius: 999px;
+  transition: width 0.3s ease;
 }
-.progress-fill.blue {
-  background: repeating-linear-gradient(
-    45deg,
-    #5b9bd5 0px,
-    #5b9bd5 8px,
-    #4a8ac5 8px,
-    #4a8ac5 16px
-  );
-}
-.progress-fill.orange {
-  background: repeating-linear-gradient(
-    45deg,
-    #e67e22 0px,
-    #e67e22 8px,
-    #d06a15 8px,
-    #d06a15 16px
-  );
-}
+.progress-fill.blue { background: linear-gradient(90deg, var(--blue), #60a5fa); }
+.progress-fill.orange { background: linear-gradient(90deg, var(--orange), #fbbf24); }
 .progress-text {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   font-size: 11px;
   color: #fff;
-  text-shadow: 1px 1px 0 #000;
-  font-weight: bold;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.35);
   white-space: nowrap;
 }
 
 /* ========== 日志控制台 ========== */
 .log-console {
-  background: #0a0a0a;
-  border: 2px solid #333;
-  padding: 10px;
-  height: 200px;
+  background: var(--log-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  height: 220px;
   overflow-y: auto;
-  font-family: "Consolas", "Courier New", monospace;
-  font-size: 11px;
-  line-height: 1.6;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11.5px;
+  line-height: 1.7;
 }
-.log-entry { margin-bottom: 2px; }
-.log-time { color: #666; }
-.log-info { color: #5b9bd5; }
-.log-success { color: #44b04b; }
-.log-warn { color: #f39c12; }
-.log-error { color: #c0392b; }
-.log-debug { color: #888; }
-.log-install { color: #e67e22; }
+.log-entry { margin-bottom: 3px; }
+.log-time { color: var(--text-3); }
+.log-info { color: var(--blue); }
+.log-success { color: var(--primary-deep); }
+.log-warn { color: var(--orange); }
+.log-error { color: var(--red); }
+.log-debug { color: var(--text-3); }
+.log-install { color: var(--orange); }
 
 /* ========== 连接横幅 ========== */
 .connection-banner {
-  padding: 14px 18px;
-  border: 3px solid #000;
-  margin-bottom: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
+  background: var(--surface);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+  transition: background 0.4s ease, border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
 }
-.connection-banner.offline {
-  background: #3a1515;
-  border-color: #c0392b;
-}
-.connection-banner.connecting {
-  background: #3a3015;
-  border-color: #f39c12;
-}
-.connection-banner.online {
-  background: #153a15;
-  border-color: #44b04b;
-}
-.banner-text { font-size: 14px; font-weight: bold; }
-.banner-hint { font-size: 11px; color: #aaa; margin-top: 2px; }
+.connection-banner:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.connection-banner.offline { background: var(--red-soft); border-color: rgba(239,68,68,0.35); }
+.connection-banner.connecting { background: var(--orange-soft); border-color: rgba(245,158,11,0.35); }
+.connection-banner.online { background: var(--primary-soft); border-color: rgba(16,185,129,0.35); }
+.banner-text { font-size: 14.5px; font-weight: 700; color: var(--text); }
+.banner-hint { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
 
 /* ========== 表单元素 ========== */
-input[type="text"], textarea, select {
+input[type='text'], textarea, select {
   width: 100%;
-  padding: 10px 12px;
-  background: #0a0a0a;
-  border: 2px solid #333;
-  color: #e0e0e0;
+  padding: 11px 14px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
   font-size: 13px;
-  font-family: "Consolas", monospace;
+  font-family: 'Consolas', 'Courier New', monospace;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.3s ease;
 }
-input[type="text"]:focus, textarea:focus, select:focus {
+input[type='text']:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: #44b04b;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 textarea { resize: vertical; min-height: 80px; }
 
@@ -378,238 +502,271 @@ textarea { resize: vertical; min-height: 80px; }
 .file-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: #151515;
-  border: 2px solid #2a2a2a;
-  margin-bottom: 8px;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.3s ease;
 }
+.file-item:hover { transform: translateX(3px); box-shadow: var(--shadow); }
 .file-icon {
-  width: 36px; height: 36px;
-  border: 2px solid #000;
+  width: 40px; height: 40px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  font-weight: bold;
+  font-weight: 800;
+  letter-spacing: 0.5px;
   flex-shrink: 0;
 }
-.file-icon.img { background: #1a3a1a; }
-.file-icon.video { background: #3a1a1a; }
-.file-icon.doc { background: #1a1a3a; }
-.file-icon.audio { background: #3a3a1a; }
-.file-icon.archive { background: #2a2a2a; }
-.file-icon.apk { background: #3a2a1a; color: #e67e22; }
-.file-icon.other { background: #1a3a3a; }
+.file-icon.img { background: var(--primary-soft); color: var(--primary-deep); }
+.file-icon.video { background: var(--red-soft); color: var(--red); }
+.file-icon.doc { background: var(--blue-soft); color: var(--blue); }
+.file-icon.audio { background: var(--orange-soft); color: var(--orange); }
+.file-icon.archive { background: rgba(148,163,184,0.18); color: var(--text-2); }
+.file-icon.apk { background: var(--orange-soft); color: var(--orange); }
+.file-icon.other { background: rgba(20,184,166,0.15); color: #14b8a6; }
 
 .file-info { flex: 1; min-width: 0; }
 .file-name {
   font-size: 13px;
-  color: #fff;
+  font-weight: 600;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.file-meta { font-size: 11px; color: #888; margin-top: 2px; }
+.file-meta { font-size: 11.5px; color: var(--text-3); margin-top: 3px; }
 
 /* ========== 拖拽区 ========== */
 .drop-zone {
-  border: 3px dashed #444;
-  padding: 40px 20px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 44px 20px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 16px;
+  transition: all 0.3s ease;
+  margin-bottom: 18px;
+  background: var(--surface);
 }
 .drop-zone:hover, .drop-zone.dragover {
-  border-color: #44b04b;
-  background: #1a2a1a;
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  transform: scale(1.005);
 }
-.drop-zone .drop-icon {
-  font-size: 36px;
-  margin-bottom: 8px;
-}
-.drop-zone .drop-text {
-  font-size: 14px;
-  color: #aaa;
-}
-.drop-zone .drop-hint {
-  font-size: 11px;
-  color: #666;
-  margin-top: 4px;
-}
+.drop-zone .drop-icon { font-size: 40px; margin-bottom: 10px; }
+.drop-zone .drop-text { font-size: 14px; color: var(--text-2); font-weight: 500; }
+.drop-zone .drop-hint { font-size: 11.5px; color: var(--text-3); margin-top: 6px; }
 
 /* ========== Toast 通知 ========== */
 .toast-container {
   position: fixed;
-  top: 16px; right: 16px;
+  top: 18px; right: 18px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .toast {
-  padding: 12px 18px;
-  border: 3px solid #000;
+  padding: 13px 18px;
+  border-radius: 14px;
   font-size: 13px;
-  color: #fff;
-  text-shadow: 1px 1px 0 #000;
-  animation: slideIn 0.3s ease;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-strong);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-3);
+  box-shadow: var(--shadow-hover);
+  animation: slideIn 0.35s ease;
   max-width: 360px;
   cursor: pointer;
 }
-.toast.success { background: #2d7a32; }
-.toast.error { background: #a02820; }
-.toast.info { background: #2a5a8a; }
-.toast.warning { background: #a06020; }
-.toast.install { background: #c06010; }
+.toast.success { border-left-color: var(--primary); }
+.toast.error { border-left-color: var(--red); }
+.toast.info { border-left-color: var(--blue); }
+.toast.warning { border-left-color: var(--orange); }
+.toast.install { border-left-color: var(--orange); }
 @keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
 }
 
 /* ========== 环境警告框 ========== */
 .env-warning {
-  background: #3a3015;
-  border: 3px solid #f39c12;
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  background: var(--orange-soft);
+  border: 1px solid rgba(245,158,11,0.4);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 18px;
 }
 .env-warning .warn-title {
   font-size: 13px;
-  color: #f39c12;
-  font-weight: bold;
+  color: var(--orange);
+  font-weight: 700;
   margin-bottom: 6px;
 }
 .env-warning .warn-body {
-  font-size: 12px;
-  color: #ddd;
-  line-height: 1.6;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.7;
 }
 
 /* ========== 步骤引导 ========== */
 .step-box {
-  background: #151515;
-  border: 2px solid #333;
-  padding: 14px;
-  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
+.step-box:hover { box-shadow: var(--shadow); }
 .step-box .step-title {
-  font-size: 13px;
-  font-weight: bold;
-  color: #8eff8e;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.step-box .step-title::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--blue));
 }
 .step-box .step-desc {
-  font-size: 12px;
-  color: #bbb;
-  line-height: 1.7;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.8;
 }
 .step-box .step-desc code {
-  background: #0a0a0a;
-  border: 1px solid #333;
-  padding: 1px 5px;
-  font-family: "Consolas", monospace;
-  font-size: 11px;
-  color: #8eff8e;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-family: 'Consolas', monospace;
+  font-size: 11.5px;
+  color: var(--primary-deep);
 }
 
 /* ========== 表格 ========== */
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th { background: #2a2a2a; padding: 8px 10px; text-align: left; color: #8eff8e; border-bottom: 2px solid #000; }
-td { padding: 8px 10px; border-bottom: 1px solid #2a2a2a; color: #ccc; }
-tr:hover td { background: #1f1f1f; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th {
+  background: var(--surface-strong);
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--text-2);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-strong);
+}
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-2); }
+tr { transition: background 0.2s ease; }
+tr:hover td { background: var(--primary-soft); }
 
 /* ========== 标签 ========== */
 .tag {
   display: inline-block;
-  padding: 2px 8px;
-  font-size: 10px;
-  border: 2px solid #000;
-  font-weight: bold;
+  padding: 3px 10px;
+  font-size: 10.5px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
-.tag-green { background: #44b04b; color: #fff; }
-.tag-blue { background: #5b9bd5; color: #fff; }
-.tag-gray { background: #555; color: #fff; }
-.tag-orange { background: #e67e22; color: #fff; }
-.tag-red { background: #c0392b; color: #fff; }
+.tag-green { background: var(--primary-soft); color: var(--primary-deep); }
+.tag-blue { background: var(--blue-soft); color: var(--blue); }
+.tag-gray { background: rgba(148,163,184,0.2); color: var(--text-2); }
+.tag-orange { background: var(--orange-soft); color: var(--orange); }
+.tag-red { background: var(--red-soft); color: var(--red); }
 
 /* ========== APK 安装面板专用 ========== */
-.apk-list { margin-bottom: 12px; }
+.apk-list { margin-bottom: 14px; }
 .apk-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #1a1510;
-  border: 2px solid #3a2a1a;
-  margin-bottom: 8px;
+  gap: 14px;
+  padding: 14px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
+.apk-item:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .apk-item .apk-icon {
-  width: 40px; height: 40px;
-  background: #e67e22;
-  border: 2px solid #000;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--orange), #fb923c);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 800;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px var(--orange-soft);
 }
 .apk-info { flex: 1; min-width: 0; }
 .apk-name {
   font-size: 13px;
-  color: #fff;
-  font-weight: bold;
+  color: var(--text);
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.apk-meta { font-size: 11px; color: #888; margin-top: 2px; }
-.apk-status {
-  font-size: 11px;
-  margin-top: 4px;
-}
-.apk-status.idle { color: #888; }
-.apk-status.installing { color: #f39c12; }
-.apk-status.success { color: #44b04b; }
-.apk-status.failed { color: #c0392b; }
+.apk-meta { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.apk-status { font-size: 11.5px; margin-top: 4px; }
+.apk-status.idle { color: var(--text-3); }
+.apk-status.installing { color: var(--orange); }
+.apk-status.success { color: var(--primary-deep); }
+.apk-status.failed { color: var(--red); }
 
 .install-progress {
-  margin-top: 6px;
-  height: 6px;
-  background: #0a0a0a;
-  border: 1px solid #333;
+  margin-top: 8px;
+  height: 8px;
+  background: var(--input-bg);
+  border-radius: 999px;
   overflow: hidden;
 }
 .install-progress-bar {
   height: 100%;
-  background: #e67e22;
+  background: linear-gradient(90deg, var(--orange), #fbbf24);
   width: 0%;
-  transition: width 0.3s;
+  border-radius: 999px;
+  transition: width 0.35s ease;
 }
 
 /* ========== ZyBOS 状态卡片 ========== */
 .zybos-card {
-  background: #1a1510;
-  border: 3px solid #e67e22;
-  padding: 14px;
-  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--orange-soft), transparent 70%);
+  border: 1px solid rgba(245,158,11,0.35);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 14px;
 }
 .zybos-card .zybos-label {
-  font-size: 10px;
-  color: #e67e22;
+  font-size: 11px;
+  color: var(--orange);
   text-transform: uppercase;
+  letter-spacing: 0.8px;
   margin-bottom: 6px;
-  font-weight: bold;
+  font-weight: 700;
 }
 .zybos-card .zybos-value {
-  font-family: "Press Start 2P", monospace;
-  font-size: 13px;
-  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
 }
-.zybos-card .zybos-value.green { color: #44b04b; }
-.zybos-card .zybos-value.red { color: #c0392b; }
-.zybos-card .zybos-value.yellow { color: #f39c12; }
+.zybos-card .zybos-value.green { color: var(--primary-deep); }
+.zybos-card .zybos-value.red { color: var(--red); }
+.zybos-card .zybos-value.yellow { color: var(--orange); }
 
 /* ========== 响应式 ========== */
 @media (max-width: 768px) {
@@ -617,12 +774,13 @@ tr:hover td { background: #1f1f1f; }
     position: fixed;
     top: 0; left: 0; bottom: 0;
     transform: translateX(-100%);
-    transition: transform 0.3s;
+    transition: transform 0.32s ease;
+    width: 230px;
   }
   .sidebar.open { transform: translateX(0); }
   .hamburger { display: flex; }
   .status-cards { grid-template-columns: repeat(2, 1fr); }
-  .page { padding: 12px; }
+  .page { padding: 14px; }
 }
 
 /* 遮罩 */
@@ -630,16 +788,19 @@ tr:hover td { background: #1f1f1f; }
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(15,23,42,0.35);
+  backdrop-filter: blur(2px);
   z-index: 99;
 }
-.overlay.show { display: block; }
+.overlay.show { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* 滚动条 */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #0a0a0a; }
-::-webkit-scrollbar-thumb { background: #333; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
 </style>
 </head>
 <body>
@@ -647,38 +808,38 @@ tr:hover td { background: #1f1f1f; }
 <!-- 侧边栏 -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <div class="logo">GHC<span>传</span></div>
+    <div class="logo">GeoRain<span>CONNECT</span></div>
     <div class="subtitle">局域网文件互传</div>
   </div>
 
   <button class="nav-item active" data-page="dashboard">
-    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" fill="#44b04b"/><rect x="9" y="1" width="6" height="6" fill="#5b9bd5"/><rect x="1" y="9" width="6" height="6" fill="#f39c12"/><rect x="9" y="9" width="6" height="6" fill="#c0392b"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1.5"/><rect x="9" y="2" width="5" height="5" rx="1.5"/><rect x="2" y="9" width="5" height="5" rx="1.5"/><rect x="9" y="9" width="5" height="5" rx="1.5"/></svg>
     状态面板
     <span class="badge offline" id="navStatusBadge"></span>
   </button>
   <button class="nav-item" data-page="connect">
-    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="none" stroke="#5b9bd5" stroke-width="2"/><line x1="5" y1="8" x2="11" y2="8" stroke="#5b9bd5" stroke-width="2"/><line x1="8" y1="5" x2="8" y2="11" stroke="#5b9bd5" stroke-width="2"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><circle cx="4.5" cy="8" r="2.5"/><circle cx="11.5" cy="8" r="2.5"/><line x1="7" y1="8" x2="9" y2="8"/></svg>
     建立连接
   </button>
   <button class="nav-item" data-page="send">
-    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="3" fill="#44b04b"/><rect x="3" y="6" width="10" height="3" fill="#3a9a40"/><rect x="3" y="11" width="10" height="3" fill="#2d7a32"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><line x1="8" y1="2.5" x2="8" y2="10"/><polyline points="4.5,6 8,2.5 11.5,6"/><line x1="3" y1="13.5" x2="13" y2="13.5"/></svg>
     发送文件
   </button>
   <button class="nav-item" data-page="receive">
-    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="3" fill="#5b9bd5"/><rect x="3" y="6" width="10" height="3" fill="#4a8ac5"/><rect x="3" y="11" width="10" height="3" fill="#3a7ab5"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><line x1="8" y1="2.5" x2="8" y2="10"/><polyline points="4.5,6.5 8,10.5 11.5,6.5"/><line x1="3" y1="13.5" x2="13" y2="13.5"/></svg>
     接收文件
   </button>
   <button class="nav-item" data-page="install">
-    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" fill="#e67e22"/><rect x="9" y="2" width="5" height="5" fill="#e67e22"/><rect x="2" y="9" width="5" height="5" fill="#e67e22"/><rect x="9" y="9" width="5" height="5" fill="#e67e22"/><rect x="4" y="4" width="2" height="2" fill="#000"/><rect x="11" y="4" width="2" height="2" fill="#000"/><rect x="4" y="11" width="2" height="2" fill="#000"/><rect x="11" y="11" width="2" height="2" fill="#000"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/><line x1="2.5" y1="7" x2="13.5" y2="7"/><line x1="8" y1="7" x2="8" y2="12.5"/></svg>
     APK 安装
-    <span class="badge" id="apkBadge" style="background:#444;"></span>
+    <span class="badge" id="apkBadge"></span>
   </button>
   <button class="nav-item" data-page="history">
-    <svg class="nav-icon" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="2" fill="#888"/><rect x="1" y="7" width="14" height="2" fill="#888"/><rect x="1" y="11" width="14" height="2" fill="#888"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><polyline points="8,5 8,8 10.5,9.5"/></svg>
     传输记录
   </button>
   <button class="nav-item" data-page="settings">
-    <svg class="nav-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" fill="none" stroke="#f39c12" stroke-width="2"/><rect x="7" y="1" width="2" height="3" fill="#f39c12"/><rect x="7" y="12" width="2" height="3" fill="#f39c12"/><rect x="1" y="7" width="3" height="2" fill="#f39c12"/><rect x="12" y="7" width="3" height="2" fill="#f39c12"/></svg>
+    <svg class="nav-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><line x1="8" y1="1.8" x2="8" y2="3.6"/><line x1="8" y1="12.4" x2="8" y2="14.2"/><line x1="1.8" y1="8" x2="3.6" y2="8"/><line x1="12.4" y1="8" x2="14.2" y2="8"/><line x1="3.6" y1="3.6" x2="4.9" y2="4.9"/><line x1="11.1" y1="11.1" x2="12.4" y2="12.4"/><line x1="3.6" y1="12.4" x2="4.9" y2="11.1"/><line x1="11.1" y1="4.9" x2="12.4" y2="3.6"/></svg>
     设置
   </button>
 
@@ -701,6 +862,10 @@ tr:hover td { background: #1f1f1f; }
       <span id="topStatusText">未连接</span>
       <div class="status-dot offline" id="topStatusDot"></div>
     </div>
+    <button class="theme-toggle" id="themeToggle" title="切换外观" aria-label="切换外观">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/><line x1="5.2" y1="5.2" x2="7" y2="7"/><line x1="17" y1="17" x2="18.8" y2="18.8"/><line x1="5.2" y1="18.8" x2="7" y2="17"/><line x1="17" y1="7" x2="18.8" y2="5.2"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+    </button>
   </div>
 
   <!-- Toast 容器 -->
@@ -751,7 +916,7 @@ tr:hover td { background: #1f1f1f; }
       </div>
       <div class="status-card">
         <div class="card-label">APK 待安装</div>
-        <div class="card-value" id="cardApkCount" style="color:#e67e22;">0</div>
+        <div class="card-value" id="cardApkCount">0</div>
       </div>
       <div class="status-card">
         <div class="card-label">WebRTC</div>
@@ -848,6 +1013,9 @@ tr:hover td { background: #1f1f1f; }
         <div id="connectResult" style="display:none;" class="step-box">
           <div class="step-title" id="connectResultTitle">连接中...</div>
           <div class="step-desc" id="connectResultDesc">正在建立连接，请稍候...</div>
+          <div style="margin-top:10px;">
+            <button class="btn btn-red btn-small" id="btnCancelConnection">取消连接</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1015,7 +1183,7 @@ tr:hover td { background: #1f1f1f; }
         </div>
         <div style="margin-bottom:14px;">
           <label style="display:block; font-size:12px; color:#888; margin-bottom:4px;">STUN 服务器</label>
-          <input type="text" id="setStunServer" value="stun:stun.l.google.com:19302">
+          <input type="text" id="setStunServer" value="stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun.stunprotocol.org:3478,stun:stun.miwifi.com:3478">
         </div>
         <div style="margin-bottom:14px;">
           <label style="display:block; font-size:12px; color:#888; margin-bottom:4px;">ZyBOS 服务名 (Android 原生)</label>
@@ -1040,7 +1208,7 @@ tr:hover td { background: #1f1f1f; }
       </div>
       <div class="panel-body">
         <div style="font-size:12px; color:#888; line-height:1.8;">
-          <strong style="color:#8eff8e;">GHC 传</strong> v5.0.0<br>
+          <strong style="color:#8eff8e;">GeoRainCONNECT</strong> v5.0.0<br>
           纯前端局域网文件互传工具<br>
           基于 WebRTC DataChannel 技术<br>
           集成 ZyBOS 系统级静默安装<br>
@@ -1054,7 +1222,7 @@ tr:hover td { background: #1f1f1f; }
 
 <script>
 /* ============================================================
-   GHC 传 v5.0.0 - 局域网文件互传 + ZyBOS 静默安装
+   GeoRainCONNECT v5.0.0 - 局域网文件互传 + ZyBOS 静默安装
    新增: APK 自动检测 + ZyBOS 系统级静默安装
    ============================================================ */
 
@@ -1063,7 +1231,7 @@ tr:hover td { background: #1f1f1f; }
 
   // ========== 全局状态 ==========
   var STATE = {
-    deviceName: '用户-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
+    deviceName: '用户-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
     peerName: '',
     connected: false,
     connecting: false,
@@ -1072,8 +1240,9 @@ tr:hover td { background: #1f1f1f; }
     dataChannel: null,
     chunkSize: 16 * 1024,
     backpressure: 4 * 1048576,
-    stunServer: 'stun:stun.l.google.com:19302',
+    stunServer: 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun.stunprotocol.org:3478,stun:stun.miwifi.com:3478',
     signalServer: '',
+    offerKeyGenerated: false,
     totalSent: 0,
     totalReceived: 0,
     history: [],
@@ -1096,19 +1265,39 @@ tr:hover td { background: #1f1f1f; }
     level = level || 'info';
     var c = $('logConsole');
     if (!c) return;
-    var time = new Date().toTimeString().substr(0, 8);
+    var time = new Date().toTimeString().slice(0, 8);
     var colors = { info:'log-info', success:'log-success', warn:'log-warn', error:'log-error', debug:'log-debug', install:'log-install' };
-    c.innerHTML += '<div class="log-entry"><span class="log-time">' + time + '</span> <span class="' + colors[level] + '">' + msg + '</span></div>';
+    var entry = document.createElement('div');
+    entry.className = 'log-entry';
+    var timeSpan = document.createElement('span');
+    timeSpan.className = 'log-time';
+    timeSpan.textContent = time;
+    var msgSpan = document.createElement('span');
+    msgSpan.className = colors[level] || 'log-info';
+    msgSpan.textContent = ' ' + msg;
+    entry.appendChild(timeSpan);
+    entry.appendChild(msgSpan);
+    c.appendChild(entry);
     c.scrollTop = c.scrollHeight;
-    console.log('[GHC]', msg);
+    console.log('[GeoRainCONNECT]', msg);
   }
   function installLog(msg, level) {
     level = level || 'install';
     var c = $('installLog');
     if (!c) return;
-    var time = new Date().toTimeString().substr(0, 8);
+    var time = new Date().toTimeString().slice(0, 8);
     var colors = { info:'log-info', success:'log-success', warn:'log-warn', error:'log-error', install:'log-install' };
-    c.innerHTML += '<div class="log-entry"><span class="log-time">' + time + '</span> <span class="' + (colors[level] || 'log-install') + '">' + msg + '</span></div>';
+    var entry = document.createElement('div');
+    entry.className = 'log-entry';
+    var timeSpan = document.createElement('span');
+    timeSpan.className = 'log-time';
+    timeSpan.textContent = time;
+    var msgSpan = document.createElement('span');
+    msgSpan.className = colors[level] || 'log-install';
+    msgSpan.textContent = ' ' + msg;
+    entry.appendChild(timeSpan);
+    entry.appendChild(msgSpan);
+    c.appendChild(entry);
     c.scrollTop = c.scrollHeight;
   }
   function formatBytes(b) {
@@ -1117,7 +1306,29 @@ tr:hover td { background: #1f1f1f; }
     if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
     return (b / 1073741824).toFixed(2) + ' GB';
   }
-  function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 6); }
+  function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  // HTML 转义，防止 XSS
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // UI 更新节流器，避免高频调用导致卡顿
+  var _uiUpdateTimer = null;
+  function throttleUIUpdate(fn, delay) {
+    delay = delay || 100;
+    if (_uiUpdateTimer) return;
+    _uiUpdateTimer = setTimeout(function () {
+      _uiUpdateTimer = null;
+      fn();
+    }, delay);
+  }
 
   // Toast 通知
   function toast(msg, type) {
@@ -1357,7 +1568,6 @@ tr:hover td { background: #1f1f1f; }
     installLog('APK 已加入安装队列: ' + name + ' (' + formatBytes(blob.size) + ')', 'success');
     renderAPKList();
     updateApkBadge();
-    updateConnectionStatus();
 
     // 自动提示
     toast('收到 APK: ' + name + '，可前往「APK 安装」页面安装', 'install');
@@ -1387,8 +1597,8 @@ tr:hover td { background: #1f1f1f; }
       html += '<div class="apk-item">' +
         '<div class="apk-icon">APK</div>' +
         '<div class="apk-info">' +
-          '<div class="apk-name">' + a.name + '</div>' +
-          '<div class="apk-meta">' + formatBytes(a.size) + ' | 接收于 ' + a.time + '</div>' +
+          '<div class="apk-name">' + escapeHtml(a.name) + '</div>' +
+          '<div class="apk-meta">' + formatBytes(a.size) + ' | 接收于 ' + escapeHtml(a.time) + '</div>' +
           '<div class="apk-status ' + statusClass + '" id="apk-status-' + a.id + '">' + statusText + '</div>' +
           '<div class="install-progress"><div class="install-progress-bar" id="apk-bar-' + a.id + '"></div></div>' +
         '</div>' +
@@ -1401,14 +1611,19 @@ tr:hover td { background: #1f1f1f; }
 
   function updateApkBadge() {
     var badge = $('apkBadge');
-    if (!badge) return;
     var count = STATE.apkList.length;
-    badge.textContent = count > 0 ? count : '';
-    badge.style.background = count > 0 ? '#e67e22' : '#444';
-    $('cardApkCount').textContent = count;
+    if (badge) {
+      badge.textContent = count > 0 ? count : '';
+      badge.classList.toggle('has-count', count > 0);
+    }
+    var cardApkCount = $('cardApkCount');
+    if (cardApkCount) cardApkCount.textContent = count;
   }
 
   // 全局函数供 onclick 调用
+  window.navigateTo = navigateTo;
+  window.resetConnection = resetConnection;
+
   window.installAPKById = function (id) {
     for (var i = 0; i < STATE.apkList.length; i++) {
       if (STATE.apkList[i].id === id) {
@@ -1422,10 +1637,14 @@ tr:hover td { background: #1f1f1f; }
   window.downloadAPKById = function (id) {
     for (var i = 0; i < STATE.apkList.length; i++) {
       if (STATE.apkList[i].id === id && STATE.apkList[i].blob) {
+        var url = URL.createObjectURL(STATE.apkList[i].blob);
         var a = document.createElement('a');
-        a.href = URL.createObjectURL(STATE.apkList[i].blob);
+        a.href = url;
         a.download = STATE.apkList[i].name;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         break;
       }
     }
@@ -1537,27 +1756,111 @@ tr:hover td { background: #1f1f1f; }
     if ($('cardReceived')) $('cardReceived').textContent = formatBytes(STATE.totalReceived);
   }
 
+  // ========== 重置连接 ==========
+  function resetConnection() {
+    if (STATE.pc) {
+      try { STATE.pc.close(); } catch (e) {}
+      STATE.pc = null;
+    }
+    if (STATE.dataChannel) {
+      try { STATE.dataChannel.close(); } catch (e) {}
+      STATE.dataChannel = null;
+    }
+    STATE.connected = false;
+    STATE.connecting = false;
+    STATE.offerKeyGenerated = false;
+    STATE.peerName = '';
+    STATE.receiving = null;
+    restoreOfferBtn();
+    updateConnectionStatus();
+    // 隐藏连接流程 UI
+    if ($('offerKeyBox')) $('offerKeyBox').style.display = 'none';
+    if ($('answerInputBox')) $('answerInputBox').style.display = 'none';
+    if ($('answerKeyBox')) $('answerKeyBox').style.display = 'none';
+    if ($('connectResult')) $('connectResult').style.display = 'none';
+    if ($('offerKeyText')) $('offerKeyText').value = '';
+    if ($('answerKeyInput')) $('answerKeyInput').value = '';
+    if ($('offerKeyInput')) $('offerKeyInput').value = '';
+    if ($('answerKeyText')) $('answerKeyText').value = '';
+    renderReceiveList();
+    log('连接已重置', 'warn');
+  }
+
+  // ========== 密钥生成（带 gathering 兜底，防止 STUN 不可达时"无反应"） ==========
+  function restoreOfferBtn() {
+    var btn = $('btnCreateOffer');
+    if (btn) { btn.disabled = false; btn.textContent = '生成邀请密钥'; }
+  }
+  function generateOfferKey() {
+    if (!STATE.pc || !STATE.pc.localDescription || !STATE.pc.localDescription.sdp) return;
+    if (STATE.offerKeyGenerated) return;
+    STATE.offerKeyGenerated = true;
+    restoreOfferBtn();
+    var keyData = { type: 'ghc-offer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
+    var encoded = encodeKey(keyData);
+    $('offerKeyText').value = encoded;
+    $('offerKeyBox').style.display = '';
+    $('answerInputBox').style.display = '';
+    log('邀请密钥已生成 (' + encoded.length + ' 字符)', 'success');
+    toast('邀请密钥已生成!', 'success');
+  }
+  function generateAnswerKey() {
+    if (!STATE.pc || !STATE.pc.localDescription || !STATE.pc.localDescription.sdp) return;
+    if (STATE.offerKeyGenerated) return;
+    STATE.offerKeyGenerated = true;
+    var keyData = { type: 'ghc-answer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
+    var encoded = encodeKey(keyData);
+    $('answerKeyText').value = encoded;
+    $('answerKeyBox').style.display = '';
+    log('应答密钥已生成', 'success'); toast('应答密钥已生成!', 'success');
+  }
+
   // ========== 创建 RTCPeerConnection ==========
   function createPeerConnection() {
     var RTC = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
     if (!RTC) throw new Error('RTCPeerConnection 不可用');
-    var config = { iceServers: [{ urls: STATE.stunServer }] };
+    // 支持逗号分隔的多个 STUN 服务器，提高国内网络可达性
+    var stunList = String(STATE.stunServer).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (stunList.length === 0) stunList = ['stun:stun.l.google.com:19302'];
+    // 规范化：无 stun:/turn: 前缀的自动补 stun:，防止构造 RTCPeerConnection 抛错
+    stunList = stunList.map(function (u) {
+      u = u.trim();
+      if (/^(stun|turn|turns):/i.test(u)) return u;
+      return 'stun:' + u;
+    });
+    var config = { iceServers: stunList.map(function (u) { return { urls: u }; }) };
     log('正在创建 RTCPeerConnection...', 'debug');
     var pc = new RTC(config);
+    var _iceTimeout = null;
     pc.oniceconnectionstatechange = function () {
       log('ICE 状态: ' + pc.iceConnectionState, 'debug');
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        if (_iceTimeout) { clearTimeout(_iceTimeout); _iceTimeout = null; }
         STATE.connected = true;
         STATE.connecting = false;
         updateConnectionStatus();
         toast('连接成功!', 'success');
         log('P2P 连接已建立', 'success');
-      } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+      } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') {
+        if (_iceTimeout) { clearTimeout(_iceTimeout); _iceTimeout = null; }
         STATE.connected = false;
         STATE.connecting = false;
         updateConnectionStatus();
-        toast('连接已断开', 'error');
-        log('连接断开: ' + pc.iceConnectionState, 'error');
+        if (pc.iceConnectionState !== 'closed') {
+          toast('连接已断开', 'error');
+          log('连接断开: ' + pc.iceConnectionState, 'error');
+        }
+      } else if (pc.iceConnectionState === 'checking') {
+        // ICE 开始检查时启动 60 秒超时
+        if (!_iceTimeout) {
+          _iceTimeout = setTimeout(function () {
+            if (!STATE.connected && STATE.connecting) {
+              log('ICE 连接超时（60秒无响应）', 'error');
+              toast('连接超时，请重试', 'error');
+              resetConnection();
+            }
+          }, 60000);
+        }
       }
     };
     pc.onconnectionstatechange = function () { log('连接状态: ' + pc.connectionState, 'debug'); };
@@ -1626,8 +1929,11 @@ tr:hover td { background: #1f1f1f; }
       STATE.receiving.chunks.push(data);
       STATE.receiving.received += data.byteLength;
       STATE.totalReceived += data.byteLength;
-      updateConnectionStatus();
-      renderReceiveList();
+      // 节流 UI 更新，避免每个 chunk 都重渲染
+      throttleUIUpdate(function () {
+        updateConnectionStatus();
+        renderReceiveList();
+      }, 80);
     }
   }
 
@@ -1656,10 +1962,12 @@ tr:hover td { background: #1f1f1f; }
       direction: 'in',
       status: '完成',
       installed: undefined,
-      duration: f.duration
+      duration: f.duration,
+      _blob: blob
     });
     renderHistory();
-    STATE.receiving = null;
+    // 不立即清空 receiving，让用户看到接收完成的文件和下载按钮
+    // 新的 file-start 消息会覆盖它
     renderReceiveList();
   }
 
@@ -1682,7 +1990,7 @@ tr:hover td { background: #1f1f1f; }
     var html = '<div class="file-item">' +
       '<div class="file-icon ' + iconClass + '">' + (iconClass === 'apk' ? 'APK' : 'FILE') + '</div>' +
       '<div class="file-info">' +
-        '<div class="file-name">' + f.name + '</div>' +
+        '<div class="file-name">' + escapeHtml(f.name) + '</div>' +
         '<div class="file-meta">' + formatBytes(f.received) + ' / ' + formatBytes(f.size) + ' (' + pct + '%)</div>' +
         '<div class="progress-bar" style="margin-top:6px; height:16px;">' +
           '<div class="progress-fill blue" style="width:' + pct + '%"></div>' +
@@ -1696,7 +2004,7 @@ tr:hover td { background: #1f1f1f; }
       html = '<div class="file-item">' +
         '<div class="file-icon ' + iconClass + '">' + (isApk ? 'APK' : 'FILE') + '</div>' +
         '<div class="file-info">' +
-          '<div class="file-name">' + f.name + '</div>' +
+          '<div class="file-name">' + escapeHtml(f.name) + '</div>' +
           '<div class="file-meta">' + formatBytes(f.size) + ' | 完成</div>' +
         '</div>' +
         '<button class="btn btn-small" onclick="downloadCurrentFile()">下载</button>' +
@@ -1709,22 +2017,31 @@ tr:hover td { background: #1f1f1f; }
   }
 
   window.downloadCurrentFile = function () {
+    var blob = null;
+    var name = '';
+    // 优先下载当前接收的文件
     if (STATE.receiving && STATE.receiving.blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(STATE.receiving.blob);
-      a.download = STATE.receiving.name;
-      a.click();
-    }
-    // 也检查最近的历史记录
-    for (var i = STATE.history.length - 1; i >= 0; i--) {
-      if (STATE.history[i]._blob) {
-        var a2 = document.createElement('a');
-        a2.href = URL.createObjectURL(STATE.history[i]._blob);
-        a2.download = STATE.history[i].name;
-        a2.click();
-        break;
+      blob = STATE.receiving.blob;
+      name = STATE.receiving.name;
+    } else {
+      // 回退：从历史记录中找最近一个已接收的文件
+      for (var i = STATE.history.length - 1; i >= 0; i--) {
+        if (STATE.history[i].direction === 'in' && STATE.history[i]._blob) {
+          blob = STATE.history[i]._blob;
+          name = STATE.history[i].name;
+          break;
+        }
       }
     }
+    if (!blob) { toast('没有可下载的文件', 'warning'); return; }
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   };
 
   // ========== 渲染发送列表 ==========
@@ -1746,7 +2063,7 @@ tr:hover td { background: #1f1f1f; }
       html += '<div class="file-item">' +
         '<div class="file-icon ' + iconClass + '">' + (iconClass === 'apk' ? 'APK' : 'FILE') + '</div>' +
         '<div class="file-info">' +
-          '<div class="file-name">' + f.name + '</div>' +
+          '<div class="file-name">' + escapeHtml(f.name) + '</div>' +
           '<div class="file-meta">' + formatBytes(f.size) + '</div>' +
         '</div>' +
         '<button class="btn btn-red btn-small" onclick="removeSendFile(' + i + ')">移除</button>' +
@@ -1835,11 +2152,11 @@ tr:hover td { background: #1f1f1f; }
         else installText = '<span class="tag tag-gray">-</span>';
       }
       html += '<tr>' +
-        '<td>' + h.time + '</td>' +
-        '<td>' + h.name + '</td>' +
+        '<td>' + escapeHtml(h.time) + '</td>' +
+        '<td>' + escapeHtml(h.name) + '</td>' +
         '<td>' + formatBytes(h.size) + '</td>' +
         '<td><span class="tag ' + tagClass + '">' + dirText + '</span></td>' +
-        '<td><span class="tag tag-gray">' + h.status + '</span></td>' +
+        '<td><span class="tag tag-gray">' + escapeHtml(h.status) + '</span></td>' +
         '<td>' + installText + '</td>' +
         '<td>' + durText + '</td>' +
       '</tr>';
@@ -1860,25 +2177,31 @@ tr:hover td { background: #1f1f1f; }
   async function createOffer() {
     if (!STATE.webrtcAvailable) { toast('WebRTC 不可用', 'error'); return; }
     try {
+      // 清理已有连接
+      if (STATE.pc) { try { STATE.pc.close(); } catch (e) {} STATE.pc = null; }
+      STATE.offerKeyGenerated = false;
       STATE.connecting = true; updateConnectionStatus(); log('正在创建邀请...', 'info');
+      var btn = $('btnCreateOffer');
+      if (btn) { btn.disabled = true; btn.textContent = '正在生成...'; }
       STATE.pc = createPeerConnection();
       var dc = STATE.pc.createDataChannel('ghc-transfer');
       setupDataChannel(dc);
-      STATE.pc.onicecandidate = function (e) {
-        if (e.candidate === null) {
-          var keyData = { type: 'ghc-offer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
-          var encoded = encodeKey(keyData);
-          $('offerKeyText').value = encoded;
-          $('offerKeyBox').style.display = '';
-          $('answerInputBox').style.display = '';
-          log('邀请密钥已生成 (' + encoded.length + ' 字符)', 'success');
-          toast('邀请密钥已生成!', 'success');
-        }
-      };
-      var offer = await STATE.pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+      STATE.pc.onicecandidate = function (e) { if (e.candidate === null) generateOfferKey(); };
+      STATE.pc.onicegatheringstatechange = function () { if (STATE.pc && STATE.pc.iceGatheringState === 'complete') generateOfferKey(); };
+      var offer = await STATE.pc.createOffer();
       await STATE.pc.setLocalDescription(offer);
       log('Offer 已创建，等待 ICE 收集...', 'debug');
-    } catch (err) { STATE.connecting = false; updateConnectionStatus(); log('创建邀请失败: ' + err.message, 'error'); toast('创建邀请失败', 'error'); }
+      // 兜底：STUN 不可达导致 gathering 挂起时，3 秒后仍用现有 SDP 生成密钥
+      setTimeout(function () {
+        if (!STATE.offerKeyGenerated && STATE.pc) {
+          log('ICE 收集未完成，使用现有 SDP 生成密钥', 'warn');
+          generateOfferKey();
+        }
+      }, 3000);
+    } catch (err) {
+      STATE.connecting = false; updateConnectionStatus(); restoreOfferBtn();
+      log('创建邀请失败: ' + err.message, 'error'); toast('创建邀请失败', 'error');
+    }
   }
 
   async function acceptOffer(offerKey) {
@@ -1886,23 +2209,26 @@ tr:hover td { background: #1f1f1f; }
     try {
       var data = decodeKey(offerKey);
       if (data.type !== 'ghc-offer') throw new Error('无效的邀请密钥');
+      // 清理已有连接
+      if (STATE.pc) { try { STATE.pc.close(); } catch (e) {} STATE.pc = null; }
+      STATE.offerKeyGenerated = false;
       STATE.connecting = true; STATE.peerName = data.from || '对方设备'; updateConnectionStatus();
       log('处理邀请密钥，来自: ' + STATE.peerName, 'info');
       STATE.pc = createPeerConnection();
       STATE.pc.ondatachannel = function (e) { setupDataChannel(e.channel); };
-      STATE.pc.onicecandidate = function (e) {
-        if (e.candidate === null) {
-          var keyData = { type: 'ghc-answer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
-          var encoded = encodeKey(keyData);
-          $('answerKeyText').value = encoded;
-          $('answerKeyBox').style.display = '';
-          log('应答密钥已生成', 'success'); toast('应答密钥已生成!', 'success');
-        }
-      };
+      STATE.pc.onicecandidate = function (e) { if (e.candidate === null) generateAnswerKey(); };
+      STATE.pc.onicegatheringstatechange = function () { if (STATE.pc && STATE.pc.iceGatheringState === 'complete') generateAnswerKey(); };
       await STATE.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
       var answer = await STATE.pc.createAnswer();
       await STATE.pc.setLocalDescription(answer);
       log('应答已创建', 'debug');
+      // 兜底：STUN 不可达导致 gathering 挂起时，3 秒后仍用现有 SDP 生成应答密钥
+      setTimeout(function () {
+        if (!STATE.offerKeyGenerated && STATE.pc) {
+          log('ICE 收集未完成，使用现有 SDP 生成应答密钥', 'warn');
+          generateAnswerKey();
+        }
+      }, 3000);
     } catch (err) { STATE.connecting = false; updateConnectionStatus(); log('处理邀请失败: ' + err.message, 'error'); toast('处理邀请失败', 'error'); }
   }
 
@@ -1910,6 +2236,7 @@ tr:hover td { background: #1f1f1f; }
     try {
       var data = decodeKey(answerKey);
       if (data.type !== 'ghc-answer') throw new Error('无效的应答密钥');
+      if (!STATE.pc) throw new Error('请先生成邀请密钥');
       log('处理应答密钥...', 'info');
       await STATE.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
       STATE.peerName = data.from || STATE.peerName || '对方设备';
@@ -1950,7 +2277,7 @@ tr:hover td { background: #1f1f1f; }
   // ========== 分享 API ==========
   function shareText(text, title) {
     if (!text) { toast('没有可分享的内容', 'warning'); return; }
-    if (navigator.share) { navigator.share({ title: title || 'GHC 密钥', text: text }).catch(function () {}); }
+    if (navigator.share) { navigator.share({ title: title || 'GeoRainCONNECT 密钥', text: text }).catch(function () {}); }
     else { copyText(text, '已复制(设备不支持分享)'); }
   }
 
@@ -1969,18 +2296,34 @@ tr:hover td { background: #1f1f1f; }
     });
     $('deviceNameInput').value = STATE.deviceName;
 
+    // 外观切换
+    $('themeToggle').addEventListener('click', function () {
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+      try { localStorage.setItem('ghc-theme', dark ? 'light' : 'dark'); } catch (e) {}
+      log('外观已切换', 'info');
+    });
+
     // 角色选择
     $('btnRoleOfferer').addEventListener('click', function () {
+      resetConnection();
       STATE.role = 'offerer';
       $('offererFlow').style.display = ''; $('answererFlow').style.display = 'none';
       $('roleDisplay').textContent = '当前角色: 发起方';
-      $('connectResult').style.display = 'none'; log('角色: 发起方', 'info');
+      log('角色: 发起方', 'info');
     });
     $('btnRoleAnswerer').addEventListener('click', function () {
+      resetConnection();
       STATE.role = 'answerer';
       $('answererFlow').style.display = ''; $('offererFlow').style.display = 'none';
       $('roleDisplay').textContent = '当前角色: 接收方';
-      $('connectResult').style.display = 'none'; log('角色: 接收方', 'info');
+      log('角色: 接收方', 'info');
+    });
+
+    // 取消连接
+    $('btnCancelConnection').addEventListener('click', function () {
+      resetConnection();
+      toast('已取消连接', 'info');
     });
 
     // 密钥操作
@@ -1990,8 +2333,8 @@ tr:hover td { background: #1f1f1f; }
     $('btnAcceptAnswer').addEventListener('click', function () { var v = $('answerKeyInput').value.trim(); if (!v) { toast('请先粘贴应答密钥', 'warning'); return; } acceptAnswer(v); });
     $('btnCopyOffer').addEventListener('click', function () { copyText($('offerKeyText').value, '邀请密钥已复制'); });
     $('btnCopyAnswer').addEventListener('click', function () { copyText($('answerKeyText').value, '应答密钥已复制'); });
-    $('btnShareOffer').addEventListener('click', function () { shareText($('offerKeyText').value, 'GHC 邀请密钥'); });
-    $('btnShareAnswer').addEventListener('click', function () { shareText($('answerKeyText').value, 'GHC 应答密钥'); });
+    $('btnShareOffer').addEventListener('click', function () { shareText($('offerKeyText').value, 'GeoRainCONNECT 邀请密钥'); });
+    $('btnShareAnswer').addEventListener('click', function () { shareText($('answerKeyText').value, 'GeoRainCONNECT 应答密钥'); });
 
     // 文件选择
     $('dropZone').addEventListener('click', function () { $('fileInput').click(); });
@@ -2029,7 +2372,7 @@ tr:hover td { background: #1f1f1f; }
     });
     $('btnResetSettings').addEventListener('click', function () {
       STATE.chunkSize = 16 * 1024; STATE.backpressure = 4 * 1048576;
-      STATE.stunServer = 'stun:stun.l.google.com:19302'; STATE.signalServer = '';
+      STATE.stunServer = 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun.stunprotocol.org:3478,stun:stun.miwifi.com:3478'; STATE.signalServer = '';
       STATE.zybosServiceName = 'zybos_manager'; STATE.bridgeName = 'GHCNative';
       $('setChunkSize').value = '16'; $('setBackpressure').value = '4';
       $('setStunServer').value = STATE.stunServer; $('setSignalServer').value = '';
@@ -2039,7 +2382,9 @@ tr:hover td { background: #1f1f1f; }
     $('btnExportSettings').addEventListener('click', function () {
       var cfg = { deviceName: STATE.deviceName, chunkSize: STATE.chunkSize / 1024, backpressure: STATE.backpressure / 1048576, stunServer: STATE.stunServer, signalServer: STATE.signalServer, zybosService: STATE.zybosServiceName, bridgeName: STATE.bridgeName };
       var blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
-      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ghc-config.json'; a.click();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'ghc-config.json'; a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     });
     $('btnImportSettings').addEventListener('click', function () {
       var input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
@@ -2076,12 +2421,14 @@ tr:hover td { background: #1f1f1f; }
 
   // ========== 页面卸载警告 ==========
   window.addEventListener('beforeunload', function (e) {
-    if (STATE.isSending) { e.preventDefault(); e.returnValue = '文件正在传输中，确定要离开吗？'; return e.returnValue; }
+    if (STATE.isSending || (STATE.receiving && STATE.receiving.received < STATE.receiving.size)) {
+      e.preventDefault(); e.returnValue = '文件正在传输中，确定要离开吗？'; return e.returnValue;
+    }
   });
 
   // ========== 初始化 ==========
   function init() {
-    log('GHC 传 v5.0.0 启动中...', 'info');
+    log('GeoRainCONNECT v5.0.0 启动中...', 'info');
     log('运行环境: ' + navigator.userAgent, 'debug');
     bindEvents();
     updateConnectionStatus();
@@ -2098,7 +2445,7 @@ tr:hover td { background: #1f1f1f; }
     }, 300);
 
     log('界面初始化完成', 'success');
-    toast('GHC 传已就绪', 'success');
+    toast('GeoRainCONNECT 已就绪', 'success');
   }
 
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
