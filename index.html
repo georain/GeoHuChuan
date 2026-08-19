@@ -938,6 +938,24 @@ tr:hover td { background: var(--primary-soft); }
   <div class="page" id="page-connect">
     <div class="panel">
       <div class="panel-header">
+        <h3>自动发现</h3>
+      </div>
+      <div class="panel-body">
+        <div class="step-desc">
+          在局域网内任一台电脑上运行 <code style="background:var(--primary-soft); padding:1px 6px; border-radius:6px; font-family:monospace;">node server.js</code>，然后在此填入该电脑的地址，即可自动发现在线设备。点击设备直接连接，无需复制密钥。
+        </div>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+          <input type="text" id="signalUrl" placeholder="ws://192.168.1.100:8787" style="flex:1; min-width:200px;">
+          <button class="btn" id="btnSignalConnect">连接</button>
+          <button class="btn btn-red btn-small" id="btnSignalDisconnect" style="display:none;">断开</button>
+        </div>
+        <div style="margin-top:8px; font-size:12px;" id="signalStatus">未连接信令服务器</div>
+        <div id="peerList" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
         <h3>手动密钥交换</h3>
       </div>
       <div class="panel-body">
@@ -1185,6 +1203,10 @@ tr:hover td { background: var(--primary-soft); }
           <label style="display:block; font-size:12px; color:#888; margin-bottom:4px;">STUN 服务器</label>
           <input type="text" id="setStunServer" value="stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun.stunprotocol.org:3478,stun:stun.miwifi.com:3478">
         </div>
+        <div style="margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="setLanOnly" style="accent-color:var(--primary); width:16px; height:16px; cursor:pointer;">
+          <label for="setLanOnly" style="font-size:12px; color:#888; cursor:pointer;">局域网直连模式（跳过 STUN，仅限同一局域网）</label>
+        </div>
         <div style="margin-bottom:14px;">
           <label style="display:block; font-size:12px; color:#888; margin-bottom:4px;">ZyBOS 服务名 (Android 原生)</label>
           <input type="text" id="setZybosService" value="zybos_manager" placeholder="ZyBOS 系统服务名称">
@@ -1241,6 +1263,7 @@ tr:hover td { background: var(--primary-soft); }
     chunkSize: 16 * 1024,
     backpressure: 4 * 1048576,
     stunServer: 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun.stunprotocol.org:3478,stun:stun.miwifi.com:3478',
+    lanOnly: false,          // 局域网直连模式：跳过 STUN，仅使用 host 候选直连
     signalServer: '',
     offerKeyGenerated: false,
     totalSent: 0,
@@ -1771,6 +1794,8 @@ tr:hover td { background: var(--primary-soft); }
     STATE.offerKeyGenerated = false;
     STATE.peerName = '';
     STATE.receiving = null;
+    signal.autoTarget = null;
+    renderPeerList();
     restoreOfferBtn();
     updateConnectionStatus();
     // 隐藏连接流程 UI
@@ -1796,6 +1821,13 @@ tr:hover td { background: var(--primary-soft); }
     if (STATE.offerKeyGenerated) return;
     STATE.offerKeyGenerated = true;
     restoreOfferBtn();
+    // 自动发现模式：不显示密钥文本，直接通过信令服务器发送 SDP 给目标设备
+    if (signal.autoTarget) {
+      sendSignal(signal.autoTarget.id, { type: 'offer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName });
+      log('邀请已自动发送给 ' + signal.autoTarget.name, 'success');
+      toast('邀请已发送，等待对方应答...', 'info');
+      return;
+    }
     var keyData = { type: 'ghc-offer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
     var encoded = encodeKey(keyData);
     $('offerKeyText').value = encoded;
@@ -1808,6 +1840,13 @@ tr:hover td { background: var(--primary-soft); }
     if (!STATE.pc || !STATE.pc.localDescription || !STATE.pc.localDescription.sdp) return;
     if (STATE.offerKeyGenerated) return;
     STATE.offerKeyGenerated = true;
+    // 自动发现模式：应答 SDP 直接通过信令返回给发起方
+    if (signal.autoTarget) {
+      sendSignal(signal.autoTarget.id, { type: 'answer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName });
+      log('应答已自动发送给 ' + signal.autoTarget.name, 'success');
+      toast('应答已发送，正在建立连接...', 'info');
+      return;
+    }
     var keyData = { type: 'ghc-answer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
     var encoded = encodeKey(keyData);
     $('answerKeyText').value = encoded;
@@ -1819,16 +1858,24 @@ tr:hover td { background: var(--primary-soft); }
   function createPeerConnection() {
     var RTC = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
     if (!RTC) throw new Error('RTCPeerConnection 不可用');
-    // 支持逗号分隔的多个 STUN 服务器，提高国内网络可达性
-    var stunList = String(STATE.stunServer).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-    if (stunList.length === 0) stunList = ['stun:stun.l.google.com:19302'];
-    // 规范化：无 stun:/turn: 前缀的自动补 stun:，防止构造 RTCPeerConnection 抛错
-    stunList = stunList.map(function (u) {
-      u = u.trim();
-      if (/^(stun|turn|turns):/i.test(u)) return u;
-      return 'stun:' + u;
-    });
-    var config = { iceServers: stunList.map(function (u) { return { urls: u }; }) };
+    var config;
+    if (STATE.lanOnly) {
+      // 局域网直连模式：不配置任何 STUN，浏览器只收集 host 候选（本机局域网 IP），
+      // 同一局域网内两台设备直接点对点连接，完全不需要外网
+      config = { iceServers: [] };
+      log('局域网直连模式：仅使用本机局域网地址直连', 'info');
+    } else {
+      // 支持逗号分隔的多个 STUN 服务器，提高国内网络可达性
+      var stunList = String(STATE.stunServer).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (stunList.length === 0) stunList = ['stun:stun.l.google.com:19302'];
+      // 规范化：无 stun:/turn: 前缀的自动补 stun:，防止构造 RTCPeerConnection 抛错
+      stunList = stunList.map(function (u) {
+        u = u.trim();
+        if (/^(stun|turn|turns):/i.test(u)) return u;
+        return 'stun:' + u;
+      });
+      config = { iceServers: stunList.map(function (u) { return { urls: u }; }) };
+    }
     log('正在创建 RTCPeerConnection...', 'debug');
     var pc = new RTC(config);
     var _iceTimeout = null;
@@ -1841,6 +1888,8 @@ tr:hover td { background: var(--primary-soft); }
         updateConnectionStatus();
         toast('连接成功!', 'success');
         log('P2P 连接已建立', 'success');
+        signal.autoTarget = null;
+        renderPeerList();
       } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') {
         if (_iceTimeout) { clearTimeout(_iceTimeout); _iceTimeout = null; }
         STATE.connected = false;
@@ -2164,6 +2213,144 @@ tr:hover td { background: var(--primary-soft); }
     body.innerHTML = html;
   }
 
+  // ========== 自动发现（信令客户端） ==========
+  // 通过局域网信令服务器自动发现设备并交换 SDP，无需手动复制密钥
+  var signal = { ws: null, peerId: '', peers: [], autoTarget: null };
+
+  function setSignalStatus(text, cls) {
+    var el = $('signalStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = cls === 'ok' ? 'var(--primary-deep)' : (cls === 'err' ? 'var(--red)' : 'var(--text-3)');
+  }
+
+  function sendSignal(to, payload) {
+    if (signal.ws && signal.ws.readyState === 1) {
+      signal.ws.send(JSON.stringify({ type: 'signal', to: to, payload: payload }));
+    }
+  }
+
+  function renderPeerList() {
+    var box = $('peerList');
+    if (!box) return;
+    var list = [];
+    if (signal.ws) {
+      for (var i = 0; i < signal.peers.length; i++) {
+        if (signal.peers[i].id !== signal.peerId) list.push(signal.peers[i]);
+      }
+    }
+    if (list.length === 0) {
+      box.innerHTML = '<div style="font-size:12px; color:var(--text-3); padding:8px 0;">' +
+        (signal.ws ? '暂未发现其他设备' : '连接服务器后自动发现在线设备') + '</div>';
+      return;
+    }
+    var html = '';
+    for (var j = 0; j < list.length; j++) {
+      var p = list[j];
+      var busy = !!(signal.autoTarget && signal.autoTarget.id === p.id && !STATE.connected);
+      var connected = !!(STATE.connected && STATE.peerName === p.name);
+      var disabled = busy || connected || STATE.connecting;
+      html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; background:var(--surface);">' +
+        '<div>' +
+          '<div style="font-weight:600; font-size:14px;">' + escapeHtml(p.name) + '</div>' +
+          '<div style="font-size:11px; color:var(--text-3);">' + (connected ? '已连接' : (busy ? '连接中...' : '在线 · 点击连接')) + '</div>' +
+        '</div>' +
+        '<button class="btn btn-small" data-auto-peer="' + escapeHtml(p.id) + '"' + (disabled ? ' disabled' : '') + '>' +
+          (connected ? '已连接' : (busy ? '连接中' : '连接')) + '</button>' +
+      '</div>';
+    }
+    box.innerHTML = html;
+    var btns = box.querySelectorAll('button[data-auto-peer]');
+    for (var k = 0; k < btns.length; k++) {
+      btns[k].addEventListener('click', (function (pid) {
+        return function () {
+          for (var m = 0; m < list.length; m++) {
+            if (list[m].id === pid) { autoConnect(list[m]); break; }
+          }
+        };
+      })(btns[k].getAttribute('data-auto-peer')));
+    }
+  }
+
+  function connectSignalServer() {
+    if (signal.ws && signal.ws.readyState === 1) { toast('已连接信令服务器', 'info'); return; }
+    var url = $('signalUrl').value.trim();
+    if (!url) url = STATE.signalServer;
+    if (!url) { toast('请先填写信令服务器地址', 'warning'); return; }
+    if (!/^wss?:\/\//i.test(url)) url = 'ws://' + url;
+    var ws;
+    try { ws = new WebSocket(url); }
+    catch (e) { toast('地址格式无效', 'error'); return; }
+    signal.ws = ws;
+    setSignalStatus('正在连接...', '');
+    ws.onopen = function () {
+      ws.send(JSON.stringify({ type: 'hello', name: STATE.deviceName }));
+      setSignalStatus('已连接服务器', 'ok');
+      $('btnSignalConnect').style.display = 'none';
+      $('btnSignalDisconnect').style.display = '';
+      log('信令服务器已连接: ' + url, 'success');
+    };
+    ws.onmessage = function (e) {
+      var m; try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (!m || typeof m.type !== 'string') return;
+      if (m.type === 'hello-ack') { signal.peerId = m.id; }
+      else if (m.type === 'peers') { signal.peers = m.list || []; renderPeerList(); }
+      else if (m.type === 'signal') { handleSignal(m); }
+      else if (m.type === 'error') { toast(m.message || '信令服务器错误', 'error'); }
+    };
+    ws.onclose = function () {
+      if (signal.ws !== ws) return; // 已被新的连接替换
+      signal.ws = null;
+      signal.peers = [];
+      signal.autoTarget = null;
+      renderPeerList();
+      $('btnSignalConnect').style.display = '';
+      $('btnSignalDisconnect').style.display = 'none';
+      setSignalStatus('与服务器的连接已断开', 'err');
+      log('信令服务器连接已断开', 'warn');
+    };
+    ws.onerror = function () {
+      setSignalStatus('连接失败，请检查地址与服务器是否运行', 'err');
+      toast('信令服务器连接失败', 'error');
+    };
+  }
+
+  function disconnectSignalServer() {
+    if (signal.ws) { try { signal.ws.close(); } catch (e) {} }
+  }
+
+  // 自动发现：收到对端信令
+  function handleSignal(m) {
+    var payload = m.payload || {};
+    if (payload.type === 'offer') {
+      if (STATE.connecting || STATE.connected) {
+        sendSignal(m.from, { type: 'busy' });
+        toast(m.fromName + ' 尝试连接，但当前已有连接进行中', 'warning');
+        return;
+      }
+      log('收到 ' + m.fromName + ' 的连接邀请，自动应答...', 'info');
+      acceptOfferAuto({ id: m.from, name: m.fromName }, payload.sdp);
+    } else if (payload.type === 'answer') {
+      if (!signal.autoTarget || signal.autoTarget.id !== m.from) return;
+      log('收到 ' + m.fromName + ' 的应答，完成连接...', 'info');
+      acceptAnswerAuto(payload.sdp, m.fromName);
+    } else if (payload.type === 'busy') {
+      toast(m.fromName + ' 当前正忙，请稍后再试', 'warning');
+      signal.autoTarget = null;
+      renderPeerList();
+    }
+  }
+
+  // 自动发现：发起连接（本端作为 offerer）
+  function autoConnect(peer) {
+    if (!signal.ws) { toast('未连接信令服务器', 'warning'); return; }
+    if (STATE.connecting || STATE.connected) { toast('已有连接进行中，请先断开', 'warning'); return; }
+    if (signal.autoTarget) { toast('正在连接其他设备，请稍候', 'warning'); return; }
+    log('自动连接 ' + peer.name + ' ...', 'info');
+    renderPeerList();
+    createOffer(peer);
+  }
+
   // ========== 密钥编码/解码 ==========
   function encodeKey(data) { return 'GHC2_' + btoa(unescape(encodeURIComponent(JSON.stringify(data)))); }
   function decodeKey(str) {
@@ -2174,15 +2361,18 @@ tr:hover td { background: var(--primary-soft); }
   }
 
   // ========== WebRTC 连接流程 ==========
-  async function createOffer() {
+  async function createOffer(peer) {
     if (!STATE.webrtcAvailable) { toast('WebRTC 不可用', 'error'); return; }
+    if (peer) signal.autoTarget = { id: peer.id, name: peer.name };
+    else signal.autoTarget = null;
     try {
       // 清理已有连接
       if (STATE.pc) { try { STATE.pc.close(); } catch (e) {} STATE.pc = null; }
       STATE.offerKeyGenerated = false;
       STATE.connecting = true; updateConnectionStatus(); log('正在创建邀请...', 'info');
+      if (STATE.lanOnly) log('局域网直连模式：请确保两台设备在同一局域网内', 'warn');
       var btn = $('btnCreateOffer');
-      if (btn) { btn.disabled = true; btn.textContent = '正在生成...'; }
+      if (btn && !signal.autoTarget) { btn.disabled = true; btn.textContent = '正在生成...'; }
       STATE.pc = createPeerConnection();
       var dc = STATE.pc.createDataChannel('ghc-transfer');
       setupDataChannel(dc);
@@ -2209,27 +2399,46 @@ tr:hover td { background: var(--primary-soft); }
     try {
       var data = decodeKey(offerKey);
       if (data.type !== 'ghc-offer') throw new Error('无效的邀请密钥');
-      // 清理已有连接
-      if (STATE.pc) { try { STATE.pc.close(); } catch (e) {} STATE.pc = null; }
-      STATE.offerKeyGenerated = false;
-      STATE.connecting = true; STATE.peerName = data.from || '对方设备'; updateConnectionStatus();
-      log('处理邀请密钥，来自: ' + STATE.peerName, 'info');
-      STATE.pc = createPeerConnection();
-      STATE.pc.ondatachannel = function (e) { setupDataChannel(e.channel); };
-      STATE.pc.onicecandidate = function (e) { if (e.candidate === null) generateAnswerKey(); };
-      STATE.pc.onicegatheringstatechange = function () { if (STATE.pc && STATE.pc.iceGatheringState === 'complete') generateAnswerKey(); };
-      await STATE.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
-      var answer = await STATE.pc.createAnswer();
-      await STATE.pc.setLocalDescription(answer);
-      log('应答已创建', 'debug');
-      // 兜底：STUN 不可达导致 gathering 挂起时，3 秒后仍用现有 SDP 生成应答密钥
-      setTimeout(function () {
-        if (!STATE.offerKeyGenerated && STATE.pc) {
-          log('ICE 收集未完成，使用现有 SDP 生成应答密钥', 'warn');
-          generateAnswerKey();
-        }
-      }, 3000);
+      signal.autoTarget = null; // 手动模式
+      await handleOfferSDP(data.sdp, data.from);
     } catch (err) { STATE.connecting = false; updateConnectionStatus(); log('处理邀请失败: ' + err.message, 'error'); toast('处理邀请失败', 'error'); }
+  }
+
+  // 自动发现模式：收到对方 offer 信令后自动应答（不经过密钥文本）
+  async function acceptOfferAuto(peer, sdp) {
+    if (!STATE.webrtcAvailable) { toast('WebRTC 不可用', 'error'); return; }
+    signal.autoTarget = { id: peer.id, name: peer.name };
+    try {
+      await handleOfferSDP(sdp, peer.name);
+    } catch (err) {
+      STATE.connecting = false; updateConnectionStatus();
+      log('自动应答失败: ' + err.message, 'error'); toast('自动应答失败', 'error');
+      signal.autoTarget = null; renderPeerList();
+    }
+  }
+
+  async function handleOfferSDP(sdp, fromName) {
+    // 清理已有连接
+    if (STATE.pc) { try { STATE.pc.close(); } catch (e) {} STATE.pc = null; }
+    STATE.offerKeyGenerated = false;
+    STATE.connecting = true; STATE.peerName = fromName || '对方设备'; updateConnectionStatus();
+    log('处理连接邀请，来自: ' + STATE.peerName, 'info');
+    if (STATE.lanOnly) log('局域网直连模式：请确保两台设备在同一局域网内', 'warn');
+    STATE.pc = createPeerConnection();
+    STATE.pc.ondatachannel = function (e) { setupDataChannel(e.channel); };
+    STATE.pc.onicecandidate = function (e) { if (e.candidate === null) generateAnswerKey(); };
+    STATE.pc.onicegatheringstatechange = function () { if (STATE.pc && STATE.pc.iceGatheringState === 'complete') generateAnswerKey(); };
+    await STATE.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdp }));
+    var answer = await STATE.pc.createAnswer();
+    await STATE.pc.setLocalDescription(answer);
+    log('应答已创建', 'debug');
+    // 兜底：STUN 不可达导致 gathering 挂起时，3 秒后仍用现有 SDP 生成应答密钥
+    setTimeout(function () {
+      if (!STATE.offerKeyGenerated && STATE.pc) {
+        log('ICE 收集未完成，使用现有 SDP 生成应答密钥', 'warn');
+        generateAnswerKey();
+      }
+    }, 3000);
   }
 
   async function acceptAnswer(answerKey) {
@@ -2245,6 +2454,27 @@ tr:hover td { background: var(--primary-soft); }
       $('connectResultTitle').textContent = '连接建立中...';
       $('connectResultDesc').textContent = '正在与 ' + STATE.peerName + ' 建立 P2P 连接...';
     } catch (err) { STATE.connecting = false; updateConnectionStatus(); log('处理应答失败: ' + err.message, 'error'); toast('连接失败', 'error'); }
+  }
+
+  // 自动发现模式：收到对方 answer 信令后完成连接（不经过密钥文本）
+  async function acceptAnswerAuto(sdp, fromName) {
+    if (!STATE.pc) {
+      log('连接已失效，请重新发起', 'error'); toast('连接已失效，请重试', 'error');
+      signal.autoTarget = null; renderPeerList();
+      return;
+    }
+    try {
+      await STATE.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: sdp }));
+      STATE.peerName = fromName || STATE.peerName || '对方设备';
+      log('自动连接: 密钥交换完成，等待建立连接...', 'success');
+      $('connectResult').style.display = '';
+      $('connectResultTitle').textContent = '连接建立中...';
+      $('connectResultDesc').textContent = '正在与 ' + STATE.peerName + ' 建立 P2P 连接...';
+    } catch (err) {
+      STATE.connecting = false; updateConnectionStatus();
+      log('自动连接失败: ' + err.message, 'error'); toast('自动连接失败', 'error');
+      signal.autoTarget = null; renderPeerList();
+    }
   }
 
   // ========== 添加文件到发送队列 ==========
@@ -2320,6 +2550,14 @@ tr:hover td { background: var(--primary-soft); }
       log('角色: 接收方', 'info');
     });
 
+    // 自动发现
+    $('btnSignalConnect').addEventListener('click', connectSignalServer);
+    $('btnSignalDisconnect').addEventListener('click', disconnectSignalServer);
+    $('signalUrl').addEventListener('blur', function () {
+      STATE.signalServer = this.value.trim();
+      if ($('setSignalServer')) $('setSignalServer').value = STATE.signalServer;
+    });
+
     // 取消连接
     $('btnCancelConnection').addEventListener('click', function () {
       resetConnection();
@@ -2366,8 +2604,10 @@ tr:hover td { background: var(--primary-soft); }
       STATE.backpressure = parseInt($('setBackpressure').value) * 1048576;
       STATE.stunServer = $('setStunServer').value.trim() || STATE.stunServer;
       STATE.signalServer = $('setSignalServer').value.trim();
+      if ($('signalUrl')) $('signalUrl').value = STATE.signalServer;
       STATE.zybosServiceName = $('setZybosService').value.trim() || 'zybos_manager';
       STATE.bridgeName = $('setBridgeName').value.trim() || 'GHCNative';
+      STATE.lanOnly = !!$('setLanOnly').checked;
       log('设置已保存', 'success'); toast('设置已保存', 'success'); updateConnectionStatus();
     });
     $('btnResetSettings').addEventListener('click', function () {
@@ -2376,14 +2616,16 @@ tr:hover td { background: var(--primary-soft); }
       STATE.zybosServiceName = 'zybos_manager'; STATE.bridgeName = 'GHCNative';
       $('setChunkSize').value = '16'; $('setBackpressure').value = '4';
       $('setStunServer').value = STATE.stunServer; $('setSignalServer').value = '';
+      if ($('signalUrl')) $('signalUrl').value = '';
       $('setZybosService').value = 'zybos_manager'; $('setBridgeName').value = 'GHCNative';
+      STATE.lanOnly = false; $('setLanOnly').checked = false;
       toast('已恢复默认设置', 'info');
     });
     $('btnExportSettings').addEventListener('click', function () {
-      var cfg = { deviceName: STATE.deviceName, chunkSize: STATE.chunkSize / 1024, backpressure: STATE.backpressure / 1048576, stunServer: STATE.stunServer, signalServer: STATE.signalServer, zybosService: STATE.zybosServiceName, bridgeName: STATE.bridgeName };
+      var cfg = { deviceName: STATE.deviceName, chunkSize: STATE.chunkSize / 1024, backpressure: STATE.backpressure / 1048576, stunServer: STATE.stunServer, lanOnly: STATE.lanOnly, signalServer: STATE.signalServer, zybosService: STATE.zybosServiceName, bridgeName: STATE.bridgeName };
       var blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
-      var a = document.createElement('a'); a.href = url; a.download = 'ghc-config.json'; a.click();
+      var a = document.createElement('a'); a.href = url; a.download = 'georainconnect-config.json'; a.click();
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     });
     $('btnImportSettings').addEventListener('click', function () {
@@ -2401,6 +2643,7 @@ tr:hover td { background: var(--primary-soft); }
             if (cfg.signalServer) { STATE.signalServer = cfg.signalServer; $('setSignalServer').value = cfg.signalServer; }
             if (cfg.zybosService) { STATE.zybosServiceName = cfg.zybosService; $('setZybosService').value = cfg.zybosService; }
             if (cfg.bridgeName) { STATE.bridgeName = cfg.bridgeName; $('setBridgeName').value = cfg.bridgeName; }
+            if (typeof cfg.lanOnly === 'boolean') { STATE.lanOnly = cfg.lanOnly; $('setLanOnly').checked = cfg.lanOnly; }
             toast('配置已导入', 'success'); log('配置已导入', 'info');
           } catch (e) { toast('配置文件无效', 'error'); }
         };
@@ -2415,8 +2658,10 @@ tr:hover td { background: var(--primary-soft); }
     $('setBackpressure').value = String(STATE.backpressure / 1048576);
     $('setStunServer').value = STATE.stunServer;
     $('setSignalServer').value = STATE.signalServer;
+    if ($('signalUrl')) $('signalUrl').value = STATE.signalServer;
     $('setZybosService').value = STATE.zybosServiceName;
     $('setBridgeName').value = STATE.bridgeName;
+    $('setLanOnly').checked = STATE.lanOnly;
   }
 
   // ========== 页面卸载警告 ==========
