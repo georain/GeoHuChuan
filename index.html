@@ -1845,6 +1845,8 @@ tr:hover td { background: var(--primary-soft); }
       sendSignal(signal.autoTarget.id, { type: 'answer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName });
       log('应答已自动发送给 ' + signal.autoTarget.name, 'success');
       toast('应答已发送，正在建立连接...', 'info');
+      signal.autoTarget = null; // 应答已发出，信令交换完成，释放连接目标
+      renderPeerList();
       return;
     }
     var keyData = { type: 'ghc-answer', sdp: STATE.pc.localDescription.sdp, from: STATE.deviceName, timestamp: Date.now() };
@@ -1888,8 +1890,12 @@ tr:hover td { background: var(--primary-soft); }
         updateConnectionStatus();
         toast('连接成功!', 'success');
         log('P2P 连接已建立', 'success');
-        signal.autoTarget = null;
-        renderPeerList();
+        // 仅当本端是发起方且已收到应答（信令交换完成）时才清理自动目标；
+        // 接收方的应答信令尚未发出时不能清理，否则 answer 会走手动分支导致发起方收不到
+        if (signal.autoTarget && STATE.pc && STATE.pc.remoteDescription && STATE.pc.remoteDescription.type === 'answer') {
+          signal.autoTarget = null;
+          renderPeerList();
+        }
       } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') {
         if (_iceTimeout) { clearTimeout(_iceTimeout); _iceTimeout = null; }
         STATE.connected = false;
@@ -2466,6 +2472,8 @@ tr:hover td { background: var(--primary-soft); }
     try {
       await STATE.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: sdp }));
       STATE.peerName = fromName || STATE.peerName || '对方设备';
+      signal.autoTarget = null; // 发起方已收到应答，信令交换完成，释放连接目标
+      renderPeerList();
       log('自动连接: 密钥交换完成，等待建立连接...', 'success');
       $('connectResult').style.display = '';
       $('connectResultTitle').textContent = '连接建立中...';
